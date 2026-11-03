@@ -154,7 +154,8 @@
          <TextBlock x:Name="PreviewLocal" Grid.Row="1" Text="සිංහල නම  •  தமிழ் பெயர்" Foreground="#C83232" FontSize="14" HorizontalAlignment="Center" Margin="0,1,0,8"/>
          <Grid Grid.Row="2">
           <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-          <StackPanel FontSize="12" VerticalAlignment="Center">
+          <StackPanel VerticalAlignment="Center">
+           <StackPanel.Resources><Style TargetType="TextBlock"><Setter Property="FontSize" Value="12"/></Style></StackPanel.Resources>
            <TextBlock x:Name="PreviewMfd" Text="M.F.D :  —"/><TextBlock x:Name="PreviewExpiry" Text="EXP.D :  —"/><TextBlock x:Name="PreviewBatch" Text="B.No :  —"/><TextBlock x:Name="PreviewNetWeight" Text="N.Wt :  —"/>
           </StackPanel>
           <TextBlock Grid.Column="1" Text="} Printed On Pack" FontSize="10" VerticalAlignment="Center" Foreground="#555"/>
