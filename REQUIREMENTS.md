@@ -61,6 +61,10 @@ When the English name changes, the application may offer an explicit Translate a
 
 Fields must be configurable for visibility in a template. The supplied reference specifically shows M.F.D, EXP.D, B.No, N.Wt, M.R.P. and Import By. Do not assume all product fields must be printed on every template.
 
+- Add four independent **Print on Pack** checkboxes directly beside their respective product-entry fields: M.F.D, EXP.D, Batch Number and Net Weight. Do not use one shared checkbox for these four fields.
+- Each checkbox controls only its matching field. When unchecked, print that field's actual value normally. When checked, suppress the actual value and print the exact text **Printed on Pack** in that field's position on the label. The other three fields must remain unaffected.
+- Persist each checkbox state with the product/label configuration and apply it consistently in the live preview, saved/reloaded design, PDF export and physical print output. The four controls must remain independently editable.
+
 ## 4. Nutrition panel — required
 
 Every food-label product record must support three independent nutrition values:
@@ -83,8 +87,8 @@ Create a built-in template based on the user-provided sample image. Preserve its
 
 1. Product name in English, prominent red heading.
 2. Sinhala and Tamil product name line below, red.
-3. Product information rows: M.F.D, EXP.D, B.No and N.Wt.
-4. Curly brace grouping those rows with “Printed On Pack”.
+3. Product information rows: M.F.D, EXP.D, B.No and N.Wt. Each row has its own independent **Print on Pack** option. If enabled for a row, show **Printed on Pack** in that row instead of its actual value; if disabled, show the actual value.
+4. Do not use a single shared “Printed On Pack” control or grouping to govern these four rows.
 5. Prominent M.R.P. (Rs.) line.
 6. Three nutrition panels: Sugar / Salt / Fat, each with Sinhala and Tamil labels and value per 100g.
 7. “Import By:” heading.
@@ -265,6 +269,7 @@ Requirements:
 ## 16. Testing and acceptance criteria
 
 1. Create and edit a product with English, Sinhala and Tamil names.
+1a. Verify the four independent Print on Pack checkboxes for M.F.D, EXP.D, Batch Number and Net Weight: each checked field alone displays “Printed on Pack” instead of its value, while unchecked fields retain their values. Verify the behaviour in preview, saved/reopened designs, PDF and physical print.
 2. Save Import By and Distributed By company/person records in their separate tab; assign them to a product and verify name/address auto-population.
 3. Set Pieces per Box; verify the Per-Piece Price checkbox hides/shows the field and label output.
 4. Verify automatic per-piece calculation equals Box Price ÷ Pieces per Box, and manual mode preserves the manually entered value.
