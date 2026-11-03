@@ -360,6 +360,11 @@ public partial class MainWindow : Window
             _qrEnabled.Checked += (_, _) => SaveSettingsSilently();
             _qrEnabled.Unchecked += (_, _) => SaveSettingsSilently();
         }
+        if (_automaticUpdates is not null)
+        {
+            _automaticUpdates.Checked += (_, _) => SaveSettingsSilently();
+            _automaticUpdates.Unchecked += (_, _) => SaveSettingsSilently();
+        }
     }
 
     private void LoadAppSettings()
