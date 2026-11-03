@@ -45,10 +45,17 @@ When the English name changes, the application may offer an explicit Translate a
 - Net Weight / Volume (N.Wt), with selectable units: kg, g, mg, L and ml.
 - Ingredients (multiline).
 - Warning (multiline).
-- Important By (user-defined text).
+- Import By — selected from reusable saved company/person records.
+- Distributed By — selected from reusable saved company/person records.
+- Maintain Import By and Distributed By records in a dedicated **Import By & Distributed By** tab, with name and full address fields. Products can be assigned saved records; selecting a record automatically fills its name and address on the product. Allow product-level overrides without changing the saved master record.
 - Distributed By (company / person).
-- Import By (company / person).
-- Importer address (multiline).
+- Pieces per Box (positive whole-number quantity).
+- Box Price (LKR / Rs.).
+- Optional Per-Piece Price display checkbox. When unchecked, hide the per-piece price input and omit it from the label. When checked, show the per-piece price and allow a pricing mode:
+  - Automatic: Per-Piece Price = Box Price ÷ Pieces per Box.
+  - Manual: user enters the per-piece price; do not overwrite it with the calculated value.
+- Validate Pieces per Box > 0 before automatic calculation. Store the pricing mode and manual value so switching modes does not silently destroy the user's entry.
+- Saved Import By and Distributed By records each contain a name and full address. The selected record automatically populates the product's label details; product-specific overrides are allowed.
 - Pieces (numeric quantity).
 - M.R.P. (LKR / Rs.): Box Price and Per Piece Price.
 
@@ -127,6 +134,7 @@ The formula is only the geometric page calculation. Also validate against the se
 - Preview at actual physical dimensions.
 - Do not silently clip or shrink important text; show an overflow warning and let the user correct it.
 - Save the design as a reusable template.
+- Provide automatic layout alignment: align text, prices, company details and nutrition panels within the label's usable bounds using consistent margins, spacing and alignment rules. Reflow where appropriate when label dimensions change. Detect and warn about overflow; never silently clip or scale content to hide overflow.
 
 ## 8. Template management
 
@@ -140,6 +148,7 @@ User operations:
 - Load template.
 - Duplicate template.
 - Edit and overwrite template.
+- Every user-created design must be saveable and reusable as a template, and remain available after the application is closed and reopened.
 - Delete user templates.
 - Set default template.
 - Export and import templates.
@@ -213,6 +222,8 @@ Use dependency injection and clear module boundaries. Keep the layout calculatio
 
 SQLite entities/tables:
 - Products.
+- CompanyProfiles (Import By and Distributed By master records, with name and address).
+- ProductCompanyAssignments (selected company records and optional product-level overrides).
 - ProductNames / localized names.
 - TranslationCache.
 - NutritionValues (or explicit nutrition properties on product model).
@@ -237,7 +248,7 @@ Requirements:
 - Black-and-gold RSS identity with a clean light workspace; optional dark appearance.
 - English application UI initially.
 - Sinhala and Tamil support in label content.
-- Main navigation: Dashboard, Products, Label Designer, Templates, Print Manager, Import/Export and Settings.
+- Main navigation: Dashboard, Products, Label Designer, Templates, Import By & Distributed By, Print Manager, Import/Export and Settings.
 - Clear validation, print and translation status messages.
 
 ## 15. Non-functional requirements
@@ -254,10 +265,14 @@ Requirements:
 ## 16. Testing and acceptance criteria
 
 1. Create and edit a product with English, Sinhala and Tamil names.
+2. Save Import By and Distributed By company/person records in their separate tab; assign them to a product and verify name/address auto-population.
+3. Set Pieces per Box; verify the Per-Piece Price checkbox hides/shows the field and label output.
+4. Verify automatic per-piece calculation equals Box Price ÷ Pieces per Box, and manual mode preserves the manually entered value.
 2. Request translation online; verify both target-language results are cached.
 3. Edit Sinhala/Tamil manually; verify re-translation does not overwrite without confirmation.
 4. Disconnect internet; verify product management, cached names, templates, layout and printing remain usable.
-5. Save, duplicate, edit, export and import a template.
+5. Save, duplicate, edit, export and import a reusable design template; close and reopen the app and verify it remains saved.
+6. Change label dimensions and verify automatic alignment/reflow plus visible overflow warnings.
 6. Reproduce the reference food label with all required sections and three nutrition panels.
 7. Enter arbitrary label dimensions and verify calculated rows, columns and sheets.
 8. Validate printer hardware margins and reject or warn on unprintable layouts.
