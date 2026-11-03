@@ -738,29 +738,38 @@ public partial class MainWindow : Window
 
         var copies = int.TryParse(product.Copies, NumberStyles.None, CultureInfo.CurrentCulture, out var parsedCopies)
             ? Math.Clamp(parsedCopies, 1, 500) : 1;
-        // Fit the largest regular grid inside the user-defined printable area.
+        // Compare normal and 90-degree layouts, then choose the one that fits the most labels.
         var printableWidthMm = pageWidthMm - marginLeftMm - marginRightMm;
         var printableHeightMm = pageHeightMm - marginTopMm - marginBottomMm;
-        var columns = (int)Math.Floor((printableWidthMm + horizontalGapMm) / (labelWidthMm + horizontalGapMm));
-        var rows = (int)Math.Floor((printableHeightMm + verticalGapMm) / (labelHeightMm + verticalGapMm));
-        if (columns < 1 || rows < 1)
+        var normalColumns = (int)Math.Floor((printableWidthMm + horizontalGapMm) / (labelWidthMm + horizontalGapMm));
+        var normalRows = (int)Math.Floor((printableHeightMm + verticalGapMm) / (labelHeightMm + verticalGapMm));
+        var rotatedColumns = (int)Math.Floor((printableWidthMm + horizontalGapMm) / (labelHeightMm + horizontalGapMm));
+        var rotatedRows = (int)Math.Floor((printableHeightMm + verticalGapMm) / (labelWidthMm + verticalGapMm));
+        var normalCount = Math.Max(0, normalColumns) * Math.Max(0, normalRows);
+        var rotatedCount = Math.Max(0, rotatedColumns) * Math.Max(0, rotatedRows);
+        var rotated = rotatedCount > normalCount;
+        var columns = rotated ? rotatedColumns : normalColumns;
+        var rows = rotated ? rotatedRows : normalRows;
+        var footprintWidthMm = rotated ? labelHeightMm : labelWidthMm;
+        var footprintHeightMm = rotated ? labelWidthMm : labelHeightMm;
+        var perPage = rotated ? rotatedCount : normalCount;
+        if (perPage < 1)
         {
-            PrintStatus.Text = "The selected label does not fit inside the page margins. Reduce the label size or margins.";
+            PrintStatus.Text = "The selected label does not fit inside the page margins, even after 90° rotation. Reduce the label size or margins.";
             return;
         }
-        var perPage = columns * rows;
-        // Centre the complete grid in the printable area so unused space is balanced on all sides.
-        var usedWidthMm = columns * labelWidthMm + Math.Max(0, columns - 1) * horizontalGapMm;
-        var usedHeightMm = rows * labelHeightMm + Math.Max(0, rows - 1) * verticalGapMm;
+        // Centre the chosen grid in the printable area.
+        var usedWidthMm = columns * footprintWidthMm + Math.Max(0, columns - 1) * horizontalGapMm;
+        var usedHeightMm = rows * footprintHeightMm + Math.Max(0, rows - 1) * verticalGapMm;
         var startLeftMm = marginLeftMm + (printableWidthMm - usedWidthMm) / 2m;
         var startTopMm = marginTopMm + (printableHeightMm - usedHeightMm) / 2m;
         var pageCount = (int)Math.Ceiling(copies / (double)perPage);
         var pages = new List<DrawingVisual>();
         for (var page = 0; page < pageCount; page++)
             pages.Add(BuildSheetVisual(product, pageWidthMm, pageHeightMm, labelWidthMm, labelHeightMm,
-                startLeftMm, startTopMm, horizontalGapMm, verticalGapMm, Math.Min(perPage, copies - page * perPage), columns));
+                startLeftMm, startTopMm, horizontalGapMm, verticalGapMm, Math.Min(perPage, copies - page * perPage), columns, rotated));
 
-        PrintLayoutSummary.Text = $"{pageWidthMm:0.##} × {pageHeightMm:0.##} mm · {orientation}\n{columns} columns × {rows} rows (auto-centred)\n{perPage} labels per page · {pageCount} page(s)\n{copies} total copies";
+        PrintLayoutSummary.Text = $"{pageWidthMm:0.##} × {pageHeightMm:0.##} mm · {orientation}\n{columns} columns × {rows} rows · {(rotated ? "90° rotated labels" : "normal labels")} · auto-centred\n{perPage} labels per page · {pageCount} page(s)\n{copies} total copies";
         var preview = new PrintPreviewWindow(pages, pageWidthMm, pageHeightMm, copies, perPage, () => PrintSheetVisuals(pages, pageWidthMm, pageHeightMm, orientation, PrinterList.SelectedItem?.ToString()));
         preview.Owner = this;
         preview.ShowDialog();
@@ -807,7 +816,7 @@ public partial class MainWindow : Window
 
     private DrawingVisual BuildSheetVisual(ProductRow product, decimal pageWidthMm, decimal pageHeightMm,
         decimal labelWidthMm, decimal labelHeightMm, decimal marginLeftMm, decimal marginTopMm,
-        decimal horizontalGapMm, decimal verticalGapMm, int labelCount, int columns)
+        decimal horizontalGapMm, decimal verticalGapMm, int labelCount, int columns, bool rotateLabels)
     {
         const double mmToDip = 96d / 25.4d;
         var pageWidth = (double)pageWidthMm * mmToDip;
@@ -825,11 +834,25 @@ public partial class MainWindow : Window
         {
             var col = i % columns;
             var row = i / columns;
-            dc.PushTransform(new TranslateTransform(marginLeft + col * (labelWidth + horizontalGap), marginTop + row * (labelHeight + verticalGap)));
+            var footprintWidth = rotateLabels ? labelHeight : labelWidth;
+            var footprintHeight = rotateLabels ? labelWidth : labelHeight;
+            var x = marginLeft + col * (footprintWidth + horizontalGap);
+            var y = marginTop + row * (footprintHeight + verticalGap);
+            if (rotateLabels)
+            {
+                // Rotate around the top-right corner so the label occupies its swapped footprint.
+                dc.PushTransform(new TranslateTransform(x + footprintWidth, y));
+                dc.PushTransform(new RotateTransform(90));
+            }
+            else
+            {
+                dc.PushTransform(new TranslateTransform(x, y));
+            }
             // Clip all artwork, including the watermark, to this individual label.
             dc.PushClip(new RectangleGeometry(new Rect(0, 0, labelWidth, labelHeight)));
             DrawProductLabel(dc, product, labelWidth, labelHeight);
             dc.Pop(); // label clip
+            if (rotateLabels) dc.Pop(); // rotation
             dc.Pop(); // label position
         }
         return visual;
