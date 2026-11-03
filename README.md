@@ -22,9 +22,9 @@ Native Windows desktop label-design and printing application by Razeen Secure So
 
 - Mandatory first-time registration and email verification are part of the approved product requirements.
 - Authentication, registration, verification, licensing, device activation, shared-user seats and entitlement checks are managed centrally by RSS Core (`https://rsscore.cv`). The desktop application must not create a separate account database or authentication Worker.
-- Product records, label designs, templates, watermark assets and print jobs remain on the PC in SQLite; they are not uploaded to the authentication service.
-- After a PC is verified, normal label creation, editing, preview and printing must continue to work offline. The verified device credential must be protected with Windows DPAPI / Windows Credential Manager.
-- Sign-in, sign-out and password recovery are required. New or unverified installations must not bypass the verification gate.
+- Product records, label designs, templates, watermark assets and print jobs remain on the PC in SQLite by default. Backup archives are encrypted locally and uploaded to the user's Google Drive only after explicit authorization.
+- Offline label work and printing are limited by the cached signed RSS Core entitlement, offline grace period and cached daily quota. The device credential must be protected with Windows Credential Manager / DPAPI.
+- Free accounts have a daily print quota, no PDF export and cannot save reusable Import By / Distributed By master profiles. Paid access is activated by a license key validated by RSS Core. New or unverified installations must not bypass the verification gate.
 - RSS Core API capabilities must be checked against its implemented and deployed contract before the desktop client enables each feature. Do not assume a route is live merely because it appears in a requirements document.
 - Detailed RSS Core API integration, known existing endpoints and missing server-side capabilities are documented in [docs/RSS-CORE-INTEGRATION.md](docs/RSS-CORE-INTEGRATION.md). Licensing, device activation, quota enforcement and Google Drive backup are specified in `REQUIREMENTS.md`.
 
