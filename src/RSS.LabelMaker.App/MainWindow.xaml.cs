@@ -50,7 +50,11 @@ public partial class MainWindow : Window
         WireDesignerOptionPersistence();
         UpdateClock();
         InitializeSessionRecovery();
-        Loaded += async (_, _) => await CheckForUpdatesAsync(false);
+        Loaded += async (_, _) =>
+        {
+            await ShowPendingUpdateWelcomeAsync();
+            await CheckForUpdatesAsync(false);
+        };
 
         _clockTimer.Interval = TimeSpan.FromSeconds(1);
         _clockTimer.Tick += (_, _) => UpdateClock();
@@ -437,6 +441,16 @@ public partial class MainWindow : Window
         }
     }
 
+    private async Task ShowPendingUpdateWelcomeAsync()
+    {
+        var info = UpdateService.ReadPendingUpdate();
+        if (info is null) return;
+
+        var dialog = new UpdateWelcomeWindow(info) { Owner = this };
+        var acknowledged = dialog.ShowDialog() == true;
+        if (acknowledged) UpdateService.AcknowledgeUpdate();
+    }
+
     private async Task CheckForUpdatesAsync(bool userRequested)
     {
         if (!userRequested && !_settings.AutomaticUpdatesEnabled) return;
@@ -454,7 +468,7 @@ public partial class MainWindow : Window
             if (_updateStatus is not null)
                 _updateStatus.Text = $"Version {result.Version} is ready. Verifying package and preparing restart…";
             SaveSessionSnapshot();
-            UpdateService.StartUpdater(result.PackagePath, Environment.ProcessPath ?? throw new InvalidOperationException("Cannot locate the running application."), Environment.ProcessId);
+            UpdateService.StartUpdater(result, Environment.ProcessPath ?? throw new InvalidOperationException("Cannot locate the running application."), Environment.ProcessId);
             _sessionTimer.Stop();
             _clockTimer.Stop();
             Application.Current.Shutdown();
