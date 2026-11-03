@@ -12,6 +12,7 @@ namespace RSS.LabelMaker.App;
 public partial class MainWindow : Window
 {
     private readonly ObservableCollection<ProductRow> _products = new();
+    private WatermarkStore? _watermarkStore;
 
     public MainWindow()
     {
@@ -19,6 +20,24 @@ public partial class MainWindow : Window
         ProductsGrid.ItemsSource = _products;
         WatermarkOpacitySlider.Value = 0.20;
         WatermarkOpacityValue.Text = "20%";
+        try
+        {
+            _watermarkStore = new WatermarkStore();
+            var savedWatermark = _watermarkStore.Load();
+            WatermarkOpacitySlider.Value = savedWatermark.Opacity;
+            if (savedWatermark.Image is { Length: > 0 } imageBytes)
+            {
+                PreviewWatermark.Source = DecodeWatermark(imageBytes);
+                PreviewWatermark.Visibility = Visibility.Visible;
+                WatermarkFileName.Text = "Saved watermark (local database)";
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this,
+                $"Local watermark storage could not be opened. The designer can still be used, but watermark changes will not persist. {ex.Message}",
+                "Local storage warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
         RefreshPrinters();
         ShowPage("Dashboard");
     }
@@ -155,14 +174,12 @@ public partial class MainWindow : Window
 
         try
         {
-            var image = new BitmapImage();
-            image.BeginInit();
-            image.UriSource = new Uri(Path.GetFullPath(dialog.FileName), UriKind.Absolute);
-            image.CacheOption = BitmapCacheOption.OnLoad;
-            image.CreateOptions = BitmapCreateOptions.PreservePixelFormat;
-            image.EndInit();
-            image.Freeze();
+            var imageBytes = File.ReadAllBytes(dialog.FileName);
+            var image = DecodeWatermark(imageBytes);
 
+            // Save the image bytes, not the original path: moving or deleting the source
+            // file will not break the saved watermark.
+            _watermarkStore?.SaveImage(imageBytes);
             PreviewWatermark.Source = image;
             PreviewWatermark.Visibility = Visibility.Visible;
             PreviewWatermark.Opacity = WatermarkOpacitySlider.Value;
@@ -183,13 +200,43 @@ public partial class MainWindow : Window
         var opacity = Math.Clamp(e.NewValue, 0d, 1d);
         PreviewWatermark.Opacity = opacity;
         WatermarkOpacityValue.Text = $"{Math.Round(opacity * 100):0}%";
+        try
+        {
+            _watermarkStore?.SaveOpacity(opacity);
+        }
+        catch (Exception ex)
+        {
+            ProductStatus.Text = $"Watermark opacity changed in preview but could not be saved: {ex.Message}";
+        }
     }
 
     private void RemoveWatermark_Click(object sender, RoutedEventArgs e)
     {
-        PreviewWatermark.Source = null;
-        PreviewWatermark.Visibility = Visibility.Collapsed;
-        WatermarkFileName.Text = "No logo selected";
+        try
+        {
+            _watermarkStore?.ClearImage();
+            PreviewWatermark.Source = null;
+            PreviewWatermark.Visibility = Visibility.Collapsed;
+            WatermarkFileName.Text = "No logo selected";
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"The watermark could not be removed from local storage. {ex.Message}",
+                "Watermark storage error", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private static BitmapImage DecodeWatermark(byte[] imageBytes)
+    {
+        using var stream = new MemoryStream(imageBytes, writable: false);
+        var image = new BitmapImage();
+        image.BeginInit();
+        image.StreamSource = stream;
+        image.CacheOption = BitmapCacheOption.OnLoad;
+        image.CreateOptions = BitmapCreateOptions.PreservePixelFormat;
+        image.EndInit();
+        image.Freeze();
+        return image;
     }
 
     private void ProductField_TextChanged(object sender, TextChangedEventArgs e) => UpdatePreview();
