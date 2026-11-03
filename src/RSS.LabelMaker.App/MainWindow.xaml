@@ -9,7 +9,7 @@
    <DockPanel LastChildFill="True">
     <StackPanel DockPanel.Dock="Top" Margin="22,26,18,28">
      <TextBlock Text="RSS" Foreground="#D5AD5B" FontSize="30" FontWeight="Bold"/>
-     <TextBlock Text="LABEL MAKER" Foreground="White" FontSize="12" FontWeight="SemiBold" CharacterSpacing="180"/>
+     <TextBlock Text="LABEL MAKER" Foreground="White" FontSize="12" FontWeight="SemiBold"/>
      <TextBlock Text="RAZEEN SECURE SOLUTION" Foreground="#AEB4BD" FontSize="9" Margin="0,8,0,0"/>
     </StackPanel>
     <StackPanel DockPanel.Dock="Bottom" Margin="20,12,20,22">
