@@ -25,7 +25,8 @@ jobs:
       - name: Derive release version
         shell: pwsh
         run: |
-          $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          $tag = $env:GITHUB_REF_NAME
+          $version = $tag.TrimStart('v')
           if ($version -notmatch '^\d+\.\d+\.\d+(\.\d+)?$') {
             throw "Tag must be vMAJOR.MINOR.PATCH (optional fourth component)."
           }
