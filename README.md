@@ -26,6 +26,7 @@ Native Windows desktop label-design and printing application by Razeen Secure So
 - After a PC is verified, normal label creation, editing, preview and printing must continue to work offline. The verified device credential must be protected with Windows DPAPI / Windows Credential Manager.
 - Sign-in, sign-out and password recovery are required. New or unverified installations must not bypass the verification gate.
 - Authentication backend implementation and production deployment are not yet verified. No live service, DNS route or email delivery should be assumed available until separately configured and tested.
+- Backend source, D1 migration and deployment checklist: [cloudflare/auth-worker/README.md](cloudflare/auth-worker/README.md).
 
 ## Company contact details
 
