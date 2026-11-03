@@ -177,6 +177,39 @@ public partial class MainWindow : Window
 
     private void ProductName_KeyUp(object sender, KeyEventArgs e) => UpdatePreview();
 
+    private void ProductName_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_isLoadingProduct || _editingProductId is null) return;
+
+        var editingProduct = _products.FirstOrDefault(p => p.Id == _editingProductId);
+        if (editingProduct is not null &&
+            !EnglishName.Text.Trim().Equals(editingProduct.English, StringComparison.OrdinalIgnoreCase))
+        {
+            _editingProductId = null;
+            SaveProductButton.Content = "Save Product";
+            ClearProductDetails();
+            ProductStatus.Text = "New product name entered. Complete its details and save to add it to Items Manager.";
+        }
+        UpdatePreview();
+    }
+
+    private void NewProduct_Click(object sender, RoutedEventArgs e)
+    {
+        _isLoadingProduct = true;
+        try
+        {
+            _editingProductId = null;
+            EnglishName.SelectedItem = null;
+            EnglishName.Text = "";
+            SaveProductButton.Content = "Save Product";
+        }
+        finally { _isLoadingProduct = false; }
+
+        ClearProductDetails();
+        ProductStatus.Text = "New product form ready. Enter a name and details, then save to add it to Items Manager.";
+        EnglishName.Focus();
+    }
+
     private void ProductName_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) => UpdatePreview();
 
     private void ClearProductDetails()
