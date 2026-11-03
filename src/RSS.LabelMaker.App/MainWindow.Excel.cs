@@ -10,7 +10,12 @@ public partial class MainWindow
 {
     private void ProductSearch_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
     {
-        var view = System.Windows.Data.CollectionViewSource.GetDefaultView(_products);
+        var view = ProductsGrid.ItemsSource as System.ComponentModel.ICollectionView;
+        if (view is null)
+        {
+            view = new System.Windows.Data.ListCollectionView(_products);
+            ProductsGrid.ItemsSource = view;
+        }
         var query = ProductSearch.Text.Trim();
         view.Filter = item =>
         {
@@ -204,7 +209,7 @@ public partial class MainWindow
             }
 
             ProductCount.Text = _products.Count.ToString(CultureInfo.InvariantCulture);
-            System.Windows.Data.CollectionViewSource.GetDefaultView(_products).Refresh();
+            if (ProductsGrid.ItemsSource is System.ComponentModel.ICollectionView productsView) productsView.Refresh();
             ProductsGrid.Items.Refresh();
             PrintProductsList.Items.Refresh();
             UpdatePreview();
