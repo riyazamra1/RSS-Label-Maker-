@@ -12,7 +12,7 @@ The first WPF interface foundation includes:
 - Print Manager shell with Windows-installed printer discovery.
 - A4-oriented designer workspace.
 
-**Important:** This is the first UI foundation, not a complete release. Product entries currently live only in the running session. SQLite persistence, translation API/cache, editable canvas elements, dimension calculations, real print rendering, PDF and bulk import remain subsequent milestones. The print action is intentionally not represented as complete yet.
+**Important:** This is the first UI foundation, not a complete release. Product entries currently live only in the running session. SQLite persistence, ChatGPT-backed Sinhala/Tamil name generation, editable canvas elements, dimension calculations, real print rendering, PDF and bulk import remain subsequent milestones. The print action is intentionally not represented as complete yet.
 
 ## Requirements
 
@@ -31,4 +31,4 @@ dotnet run --project .\src\RSS.LabelMaker.App\RSS.LabelMaker.App.csproj
 
 This is a native WPF application. It is not a WebView wrapper and does not require RSS Core, a server, sign-in or a subscription.
 
-See [REQUIREMENTS.md](REQUIREMENTS.md) for the approved product specification.
+Core label workflows remain free and offline. Automatic English-to-Sinhala and English-to-Tamil transliteration/translation has a Free allowance of 5 successful uses per language per Asia/Colombo day; Premium provides unlimited automatic generation. Manual Sinhala/Tamil entry remains free and offline. See [REQUIREMENTS.md](REQUIREMENTS.md) and [the transliteration implementation contract](docs/TRANSLITERATION_IMPLEMENTATION.md) for the approved rules.
