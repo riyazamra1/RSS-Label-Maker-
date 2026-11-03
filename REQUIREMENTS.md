@@ -329,7 +329,7 @@ Requirements:
 - Transaction-safe writes.
 - Backup and restore.
 - Safe migration/backup strategy.
-- A small online authentication service is required only for registration, email verification, sign-in, password recovery and account/session administration. Product, label, template and print data remain local in SQLite; no product data is uploaded for authentication.
+- RSS Core owns user authentication and account/session administration. Local SQLite stores product, label, template and print data; it does not store account passwords or become the user database.
 
 ## 14. UX and branding
 
@@ -343,14 +343,15 @@ Requirements:
 
 ## 15. Non-functional requirements
 
-- After initial device verification, product creation, editing, design, preview and printing work without internet.
-- Translation is the only core workflow requiring internet.
+- After initial RSS Core authorization, product creation, editing, design and preview may work offline within the signed entitlement and cached quota rules.
+- Printing while offline is permitted only within the cached signed quota and offline grace period.
+- Registration, verification, license activation, quota reconciliation, shared-user changes and Google Drive backup/restore require internet.
 - Avoid data loss; autosave drafts or provide clear save state.
 - No silent text clipping, label overlap or page scaling.
 - Stable operation with large product lists and bulk jobs.
 - Logging for diagnostics without recording translation credentials or sensitive secrets.
 - Installer and application must support the declared Windows 10/11 target; validate actual OS/runtime requirements during build.
-- Free use with mandatory email-verified account registration; no subscription, paid activation or RSS Core connection. Online authentication is required for first-time verification and account recovery, not for normal offline label work on an already-authorized PC.
+- Free use requires a verified RSS Core account and is subject to the Free entitlement's daily print quota and feature flags. Paid access is a one-time annual RSS Premium license entitlement; do not assume recurring monthly billing.
 
 ## Logo watermark
 
