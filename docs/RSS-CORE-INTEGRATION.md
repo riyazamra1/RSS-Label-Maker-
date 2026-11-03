@@ -1,3 +1,11 @@
+## RSS ecosystem placement and distribution
+- RSS Label Maker (RLM) is an official product in the RSS ecosystem. It must be managed through the existing RSS Core Portal and presented on the existing public website at https://rssapps.net.
+- Do not create a separate RLM portal, standalone account database, separate licensing authority, or separate public website/domain.
+- RSS Core Portal: provide the authorized product administration and customer account workflows for RLM, including product configuration, user registration and email verification, the central user database, 14-day trial eligibility/status, license plans and administrator-configurable prices, license-key issuance/redemption, annual/lifetime entitlements, Payments.lk payment fulfillment, device activations, network shared-user seats, and audit history.
+- rssapps.net: provide a public RLM product page with product description, features, screenshots, system requirements, proposed pricing, trial terms, and clear registration/purchase calls to action. Registration and purchase must route into the existing RSS Core identity, licensing and payment workflows; do not duplicate accounts or payment records.
+- Keep RLM product branding and customer-facing information consistent between RSS Core Portal and rssapps.net. RSS Core remains the source of truth for all user, license, trial, pricing and entitlement data.
+- The native Windows RLM application consumes RSS Core APIs for identity and entitlements. The public website must not expose administrative APIs, secrets, internal service URLs or private customer data.
+
 # RSS Core integration contract — RSS Label Maker
 
 **Status:** Required architecture. This document separates existing RSS Core behavior from missing work. It does not claim that missing APIs are implemented or deployed.
