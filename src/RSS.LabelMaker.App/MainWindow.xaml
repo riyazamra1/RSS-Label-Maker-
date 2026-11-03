@@ -261,7 +261,9 @@
        <TextBlock Text="Orientation" FontSize="11"/><ComboBox SelectedIndex="0" Margin="0,5,0,14"><ComboBoxItem Content="Portrait"/><ComboBoxItem Content="Landscape"/></ComboBox>
        <TextBlock Text="Scale" FontSize="11"/><ComboBox SelectedIndex="0" Margin="0,5,0,14"><ComboBoxItem Content="Actual size (100%)"/><ComboBoxItem Content="Fit to page (not recommended)"/></ComboBox>
        <Button Content="Refresh printers" Click="RefreshPrinters_Click" HorizontalAlignment="Left"/>
-       <Button Content="Print test page" Click="TestPrint_Click" Background="#C69A43" Margin="0,18,0,0" HorizontalAlignment="Left"/>
+       <Button Content="Print selected product label" Click="PrintSelectedLabel_Click" Background="#C69A43" Margin="0,18,0,0" HorizontalAlignment="Left"/>
+       <TextBlock Text="Select a saved product in Products, set label dimensions in Designer, then print at actual size." Foreground="#77808C" FontSize="10" TextWrapping="Wrap" Margin="0,8,0,0"/>
+              <Button Content="Print test page" Click="TestPrint_Click" Background="#C69A43" Margin="0,18,0,0" HorizontalAlignment="Left"/>
        <TextBlock x:Name="PrintStatus" Text="Printer selection is read from Windows." Foreground="#77808C" FontSize="11" Margin="0,12,0,0" TextWrapping="Wrap"/>
       </StackPanel>
      </Border>
