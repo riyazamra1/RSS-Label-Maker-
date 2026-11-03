@@ -369,6 +369,8 @@ public partial class MainWindow : Window
 
     private void PerPiecePricing_Changed(object sender, RoutedEventArgs e) => UpdatePerPiecePrice();
 
+    private void PerPiecePricingMode_Changed(object sender, SelectionChangedEventArgs e) => UpdatePerPiecePrice();
+
     private void UpdatePerPiecePrice()
     {
         if (PerPiecePricePanel is null || ShowPerPiecePrice is null)
