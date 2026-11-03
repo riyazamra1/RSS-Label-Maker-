@@ -59,3 +59,5 @@ See [REQUIREMENTS.md](REQUIREMENTS.md) for the approved product specification.
 ## Development workflow
 
 Work is being performed on `feature/live-print-on-pack-preview`. Keep `main` untouched. Do not deploy this desktop application. Do not report a Windows build, launch, printer, PDF or translation test as passed unless it has actually been run and verified on a suitable Windows environment.
+
+- Product editor profile selection: Import By and Distributed By dropdowns use saved profiles. Selecting a profile fills editable product-level name/address fields; edits are stored as product snapshots so later master-profile changes do not silently overwrite existing products. The selected profile IDs and product-level details are persisted with each product. Label preview includes both parties and their addresses.
