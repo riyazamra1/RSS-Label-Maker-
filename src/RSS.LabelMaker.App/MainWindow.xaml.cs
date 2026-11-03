@@ -76,6 +76,24 @@ public partial class MainWindow : Window
         ShowPage("Dashboard");
     }
 
+
+    private async void SignOut_Click(object sender, RoutedEventArgs e)
+    {
+        if (MessageBox.Show(this, "Sign out from RSS Label Maker on this PC? Local offline access will be removed.",
+            "Confirm sign out", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            return;
+        var token = DeviceCredentialStore.Read();
+        if (!string.IsNullOrWhiteSpace(token))
+        {
+            try { await new AuthApiClient().PostAsync("/auth/logout", new { }, token); }
+            catch { /* Local sign-out must still work when offline. */ }
+        }
+        DeviceCredentialStore.Clear();
+        MessageBox.Show(this, "This PC has been signed out. Reopen RSS Label Maker to sign in again.",
+            "Signed out", MessageBoxButton.OK, MessageBoxImage.Information);
+        Application.Current.Shutdown();
+    }
+
     private void Nav_Click(object sender, RoutedEventArgs e)
     {
         if (sender is Button button && button.Tag is string page)
