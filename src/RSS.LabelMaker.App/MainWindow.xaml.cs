@@ -120,6 +120,26 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (ShowPerPiecePrice.IsChecked == true)
+        {
+            if (PerPiecePricingMode.SelectedIndex == 0)
+            {
+                if (!int.TryParse(PiecesPerBox.Text, NumberStyles.None, CultureInfo.CurrentCulture, out var pieces) ||
+                    pieces <= 0 ||
+                    !decimal.TryParse(BoxPrice.Text, NumberStyles.Number, CultureInfo.CurrentCulture, out var boxPrice) ||
+                    boxPrice < 0)
+                {
+                    ProductStatus.Text = "Automatic per-piece pricing requires a positive whole-number Pieces per Box and a non-negative Box Price.";
+                    return;
+                }
+            }
+            else if (!decimal.TryParse(ManualPerPiecePrice.Text, NumberStyles.Number, CultureInfo.CurrentCulture, out var manualPrice) || manualPrice < 0)
+            {
+                ProductStatus.Text = "Enter a valid non-negative manual per-piece price.";
+                return;
+            }
+        }
+
         var product = new ProductRow
         {
             Id = _editingProductId ?? Guid.NewGuid().ToString("N"),
