@@ -484,6 +484,7 @@ public partial class MainWindow : Window
         }
         var product = new ProductRow
         {
+            Category = (ProductCategory.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Other",
             English = EnglishName.Text.Trim(), Sinhala = SinhalaName.Text.Trim(), Tamil = TamilName.Text.Trim(),
             Mfd = Mfd.Text.Trim(), Expiry = Expiry.Text.Trim(), Batch = Batch.Text.Trim(),
             NetWeight = NetWeight.Text.Trim(), Sugar = Sugar.Text.Trim(), Salt = Salt.Text.Trim(), Fat = Fat.Text.Trim(),
@@ -498,12 +499,13 @@ public partial class MainWindow : Window
             using var command = connection.CreateCommand();
             command.CommandText = """
                 INSERT INTO Products
-                (English, Sinhala, Tamil, Mfd, Expiry, Batch, NetWeight, Sugar, Salt, Fat, Mrp, Importer, Copies,
+                (Category, English, Sinhala, Tamil, Mfd, Expiry, Batch, NetWeight, Sugar, Salt, Fat, Mrp, Importer, Copies,
                  PrintMfd, PrintExpiry, PrintBatch, PrintNetWeight, CreatedUtc)
                 VALUES
-                ($english, $sinhala, $tamil, $mfd, $expiry, $batch, $weight, $sugar, $salt, $fat, $mrp, $importer, $copies,
+                ($category, $english, $sinhala, $tamil, $mfd, $expiry, $batch, $weight, $sugar, $salt, $fat, $mrp, $importer, $copies,
                  $printMfd, $printExpiry, $printBatch, $printWeight, $createdUtc);
                 """;
+            command.Parameters.AddWithValue("$category", product.Category);
             command.Parameters.AddWithValue("$english", product.English);
             command.Parameters.AddWithValue("$sinhala", product.Sinhala);
             command.Parameters.AddWithValue("$tamil", product.Tamil);
@@ -563,6 +565,7 @@ public partial class MainWindow : Window
         command.CommandText = """
             CREATE TABLE IF NOT EXISTS Products (
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Category TEXT NOT NULL DEFAULT 'Other',
                 English TEXT NOT NULL, Sinhala TEXT NOT NULL DEFAULT '', Tamil TEXT NOT NULL DEFAULT '',
                 Mfd TEXT NOT NULL DEFAULT '', Expiry TEXT NOT NULL DEFAULT '', Batch TEXT NOT NULL DEFAULT '',
                 NetWeight TEXT NOT NULL DEFAULT '', Sugar TEXT NOT NULL DEFAULT '', Salt TEXT NOT NULL DEFAULT '',
@@ -573,6 +576,22 @@ public partial class MainWindow : Window
             );
             """;
         command.ExecuteNonQuery();
+
+        // Upgrade databases created by earlier versions without losing saved products.
+        using var columnsCommand = connection.CreateCommand();
+        columnsCommand.CommandText = "PRAGMA table_info(Products);";
+        using var reader = columnsCommand.ExecuteReader();
+        var hasCategory = false;
+        while (reader.Read())
+            if (string.Equals(reader.GetString(1), "Category", StringComparison.OrdinalIgnoreCase))
+                hasCategory = true;
+        reader.Close();
+        if (!hasCategory)
+        {
+            using var migration = connection.CreateCommand();
+            migration.CommandText = "ALTER TABLE Products ADD COLUMN Category TEXT NOT NULL DEFAULT 'Other';";
+            migration.ExecuteNonQuery();
+        }
     }
 
     private void LoadProducts()
@@ -581,20 +600,20 @@ public partial class MainWindow : Window
         connection.Open();
         using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT English, Sinhala, Tamil, Mfd, Expiry, Batch, NetWeight, Sugar, Salt, Fat, Mrp, Importer, Copies,
+            SELECT Category, English, Sinhala, Tamil, Mfd, Expiry, Batch, NetWeight, Sugar, Salt, Fat, Mrp, Importer, Copies,
                    PrintMfd, PrintExpiry, PrintBatch, PrintNetWeight FROM Products ORDER BY Id DESC;
             """;
         using var reader = command.ExecuteReader();
         while (reader.Read())
             _products.Add(new ProductRow
             {
-                English = reader.GetString(0), Sinhala = reader.GetString(1), Tamil = reader.GetString(2),
-                Mfd = reader.GetString(3), Expiry = reader.GetString(4), Batch = reader.GetString(5),
-                NetWeight = reader.GetString(6), Sugar = reader.GetString(7), Salt = reader.GetString(8),
-                Fat = reader.GetString(9), Mrp = reader.GetString(10), Importer = reader.GetString(11),
-                Copies = reader.GetInt32(12), PrintMfd = reader.GetInt32(13) == 1,
-                PrintExpiry = reader.GetInt32(14) == 1, PrintBatch = reader.GetInt32(15) == 1,
-                PrintNetWeight = reader.GetInt32(16) == 1
+                Category = reader.GetString(0), English = reader.GetString(1), Sinhala = reader.GetString(2), Tamil = reader.GetString(3),
+                Mfd = reader.GetString(4), Expiry = reader.GetString(5), Batch = reader.GetString(6),
+                NetWeight = reader.GetString(7), Sugar = reader.GetString(8), Salt = reader.GetString(9),
+                Fat = reader.GetString(10), Mrp = reader.GetString(11), Importer = reader.GetString(12),
+                Copies = reader.GetInt32(13), PrintMfd = reader.GetInt32(14) == 1,
+                PrintExpiry = reader.GetInt32(15) == 1, PrintBatch = reader.GetInt32(16) == 1,
+                PrintNetWeight = reader.GetInt32(17) == 1
             });
         ProductCount.Text = _products.Count.ToString();
         if (_products.Count > 0) UpdateLabelPreview(_products[0]);
@@ -676,6 +695,7 @@ public partial class MainWindow : Window
 
     private sealed class ProductRow
     {
+        public string Category { get; init; } = "Other";
         public string English { get; init; } = "";
         public string Sinhala { get; init; } = "";
         public string Tamil { get; init; } = "";

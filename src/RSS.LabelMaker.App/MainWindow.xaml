@@ -84,10 +84,11 @@
       <StackPanel>
        <TextBlock Text="PRODUCT DETAILS" FontSize="11" FontWeight="Bold" Foreground="#77808C" Margin="0,0,0,12"/>
        <Grid>
-        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-        <StackPanel Grid.Column="0" Margin="0,0,12,0"><TextBlock Text="Product name (English)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="EnglishName" /></StackPanel>
-        <StackPanel Grid.Column="1" Margin="0,0,12,0"><TextBlock Text="Product name (Sinhala)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="SinhalaName"/></StackPanel>
-        <StackPanel Grid.Column="2"><TextBlock Text="Product name (Tamil)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="TamilName"/></StackPanel>
+        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+        <StackPanel Grid.Column="0" Margin="0,0,12,0"><TextBlock Text="Category (required)" FontSize="11" Margin="0,0,0,5"/><ComboBox x:Name="ProductCategory" SelectedIndex="0" Padding="6"><ComboBoxItem Content="Food &amp; Beverage"/><ComboBoxItem Content="Grocery &amp; Staples"/><ComboBoxItem Content="Health &amp; Pharmaceuticals"/><ComboBoxItem Content="Beauty &amp; Personal Care"/><ComboBoxItem Content="Household &amp; Cleaning"/><ComboBoxItem Content="Electronics"/><ComboBoxItem Content="Clothing &amp; Textiles"/><ComboBoxItem Content="Stationery &amp; Office"/><ComboBoxItem Content="Other"/></ComboBox></StackPanel>
+        <StackPanel Grid.Column="1" Margin="0,0,12,0"><TextBlock Text="Product name (English)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="EnglishName" /></StackPanel>
+        <StackPanel Grid.Column="2" Margin="0,0,12,0"><TextBlock Text="Product name (Sinhala)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="SinhalaName"/></StackPanel>
+        <StackPanel Grid.Column="3"><TextBlock Text="Product name (Tamil)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="TamilName"/></StackPanel>
        </Grid>
        <Grid Margin="0,12,0,0">
         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
@@ -117,6 +118,7 @@
        <TextBlock DockPanel.Dock="Top" Text="PRODUCT LIST" FontSize="11" FontWeight="Bold" Foreground="#77808C" Margin="0,0,0,12"/>
        <DataGrid x:Name="ProductsGrid" AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True" HeadersVisibility="Column" GridLinesVisibility="Horizontal" BorderThickness="0">
         <DataGrid.Columns>
+         <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="*"/>
          <DataGridTextColumn Header="Product name" Binding="{Binding English}" Width="2*"/>
          <DataGridTextColumn Header="Sinhala" Binding="{Binding Sinhala}" Width="*"/>
          <DataGridTextColumn Header="Tamil" Binding="{Binding Tamil}" Width="*"/>
