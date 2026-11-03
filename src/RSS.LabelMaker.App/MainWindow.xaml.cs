@@ -1,8 +1,11 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.IO;
 using System.Printing;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media.Imaging;
+using Microsoft.Win32;
 
 namespace RSS.LabelMaker.App;
 
@@ -14,6 +17,8 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         ProductsGrid.ItemsSource = _products;
+        WatermarkOpacitySlider.Value = 0.20;
+        WatermarkOpacityValue.Text = "20%";
         RefreshPrinters();
         ShowPage("Dashboard");
     }
@@ -134,6 +139,58 @@ public partial class MainWindow : Window
     private static bool TryReadMillimetres(string value, out decimal result) =>
         decimal.TryParse(value, NumberStyles.Number, CultureInfo.CurrentCulture, out result) ||
         decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out result);
+
+    private void ChooseWatermark_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Choose a logo for the label watermark",
+            Filter = "Image files|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.tif;*.tiff|All files|*.*",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+
+        if (dialog.ShowDialog(this) != true)
+            return;
+
+        try
+        {
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.UriSource = new Uri(Path.GetFullPath(dialog.FileName), UriKind.Absolute);
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.CreateOptions = BitmapCreateOptions.PreservePixelFormat;
+            image.EndInit();
+            image.Freeze();
+
+            PreviewWatermark.Source = image;
+            PreviewWatermark.Visibility = Visibility.Visible;
+            PreviewWatermark.Opacity = WatermarkOpacitySlider.Value;
+            WatermarkFileName.Text = Path.GetFileName(dialog.FileName);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"The selected image could not be loaded. {ex.Message}",
+                "Watermark image error", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void WatermarkOpacity_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (WatermarkOpacityValue is null || PreviewWatermark is null)
+            return;
+
+        var opacity = Math.Clamp(e.NewValue, 0d, 1d);
+        PreviewWatermark.Opacity = opacity;
+        WatermarkOpacityValue.Text = $"{Math.Round(opacity * 100):0}%";
+    }
+
+    private void RemoveWatermark_Click(object sender, RoutedEventArgs e)
+    {
+        PreviewWatermark.Source = null;
+        PreviewWatermark.Visibility = Visibility.Collapsed;
+        WatermarkFileName.Text = "No logo selected";
+    }
 
     private void ProductField_TextChanged(object sender, TextChangedEventArgs e) => UpdatePreview();
 
