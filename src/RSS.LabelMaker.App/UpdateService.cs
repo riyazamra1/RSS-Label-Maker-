@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -95,7 +96,7 @@ internal static class UpdateService
         start.ArgumentList.Add(executablePath);
         start.ArgumentList.Add("-ParentPid");
         start.ArgumentList.Add(parentProcessId.ToString());
-        Process.Start(start) ?? throw new InvalidOperationException("Could not start the separate update process.");
+        _ = Process.Start(start) ?? throw new InvalidOperationException("Could not start the separate update process.");
     }
 
     private const string UpdaterScript = """
