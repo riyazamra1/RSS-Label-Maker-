@@ -752,7 +752,7 @@ public partial class MainWindow : Window
             pages.Add(BuildSheetVisual(product, pageWidthMm, pageHeightMm, labelWidthMm, labelHeightMm,
                 marginMm, gapMm, Math.Min(perPage, copies - page * perPage), columns));
 
-        var preview = new PrintPreviewWindow(pages, pageWidthMm, pageHeightMm, copies, perPage, orientation);
+        var preview = new PrintPreviewWindow(pages, pageWidthMm, pageHeightMm, copies, perPage, () => PrintSheetVisuals(pages, pageWidthMm, pageHeightMm, orientation));
         preview.Owner = this;
         preview.ShowDialog();
         PrintStatus.Text = $"Print layout: {columns} columns × {rows} rows; {perPage} labels per page; {pageCount} page(s) for {copies} copies.";
