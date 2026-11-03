@@ -15,6 +15,9 @@ public partial class MainWindow : Window
 {
     private readonly ObservableCollection<ProductRow> _products = new();
     private readonly DispatcherTimer _clockTimer = new();
+    private readonly DispatcherTimer _sessionTimer = new();
+    private bool _isRestoringSession;
+    private string _lastActivePage = "Dashboard";
     private ClockSettings _settings = new();
     private TextBlock? _clockDate;
     private TextBlock? _clockTime;
@@ -44,11 +47,17 @@ public partial class MainWindow : Window
         LoadAppSettings();
         WireDesignerOptionPersistence();
         UpdateClock();
+        InitializeSessionRecovery();
 
         _clockTimer.Interval = TimeSpan.FromSeconds(1);
         _clockTimer.Tick += (_, _) => UpdateClock();
         _clockTimer.Start();
-        Closed += (_, _) => _clockTimer.Stop();
+        Closed += (_, _) =>
+        {
+            SaveSessionSnapshot();
+            _clockTimer.Stop();
+            _sessionTimer.Stop();
+        };
     }
 
     private void BuildClockAndSettingsUi()
@@ -426,6 +435,181 @@ public partial class MainWindow : Window
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "Razeen Secure Solution", "RSS Label Maker", "settings.json");
 
+    private void InitializeSessionRecovery()
+    {
+        _sessionTimer.Interval = TimeSpan.FromSeconds(2);
+        _sessionTimer.Tick += (_, _) => SaveSessionSnapshot();
+
+        _isRestoringSession = true;
+        RestoreSessionSnapshot();
+        _isRestoringSession = false;
+
+        foreach (var input in new[]
+        {
+            EnglishName, SinhalaName, TamilName, Mfd, Expiry, Batch, NetWeight,
+            Sugar, Salt, Fat, Mrp, Importer, Copies, LabelWidthInput, LabelHeightInput
+        })
+            input.TextChanged += SessionInputChanged;
+
+        foreach (var check in new[] { PrintMfd, PrintExpiry, PrintBatch, PrintNetWeight })
+        {
+            check.Checked += SessionInputChanged;
+            check.Unchecked += SessionInputChanged;
+        }
+
+        ProductCategory.SelectionChanged += SessionSelectionChanged;
+        LabelPaperSize.SelectionChanged += SessionSelectionChanged;
+        ProductsGrid.SelectionChanged += SessionSelectionChanged;
+        _sessionTimer.Start();
+    }
+
+    private void SessionInputChanged(object sender, RoutedEventArgs e)
+    {
+        if (!_isRestoringSession) SaveSessionSnapshot();
+    }
+
+    private void SessionSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_isRestoringSession) SaveSessionSnapshot();
+    }
+
+    private void SaveSessionSnapshot()
+    {
+        if (_isRestoringSession || !IsInitialized) return;
+
+        try
+        {
+            var snapshot = new SessionSnapshot
+            {
+                SavedUtc = DateTimeOffset.UtcNow,
+                LastPage = _lastActivePage,
+                English = EnglishName.Text,
+                Sinhala = SinhalaName.Text,
+                Tamil = TamilName.Text,
+                Mfd = Mfd.Text,
+                Expiry = Expiry.Text,
+                Batch = Batch.Text,
+                NetWeight = NetWeight.Text,
+                Sugar = Sugar.Text,
+                Salt = Salt.Text,
+                Fat = Fat.Text,
+                Mrp = Mrp.Text,
+                Importer = Importer.Text,
+                Copies = Copies.Text,
+                CategoryIndex = ProductCategory.SelectedIndex,
+                PrintMfd = PrintMfd.IsChecked == true,
+                PrintExpiry = PrintExpiry.IsChecked == true,
+                PrintBatch = PrintBatch.IsChecked == true,
+                PrintNetWeight = PrintNetWeight.IsChecked == true,
+                LabelWidth = LabelWidthInput.Text,
+                LabelHeight = LabelHeightInput.Text,
+                PaperIndex = LabelPaperSize.SelectedIndex,
+                SelectedProductIndex = ProductsGrid.SelectedIndex,
+                WindowWidth = Width,
+                WindowHeight = Height,
+                IsMaximized = WindowState == WindowState.Maximized
+            };
+
+            var path = GetSessionPath();
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            var temporaryPath = path + ".tmp";
+            File.WriteAllText(temporaryPath, JsonSerializer.Serialize(snapshot, new JsonSerializerOptions { WriteIndented = true }));
+            File.Move(temporaryPath, path, true);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"RLM session checkpoint failed: {ex}");
+        }
+    }
+
+    private void RestoreSessionSnapshot()
+    {
+        var path = GetSessionPath();
+        if (!File.Exists(path)) return;
+
+        try
+        {
+            var snapshot = JsonSerializer.Deserialize<SessionSnapshot>(File.ReadAllText(path));
+            if (snapshot is null) return;
+
+            EnglishName.Text = snapshot.English;
+            SinhalaName.Text = snapshot.Sinhala;
+            TamilName.Text = snapshot.Tamil;
+            Mfd.Text = snapshot.Mfd;
+            Expiry.Text = snapshot.Expiry;
+            Batch.Text = snapshot.Batch;
+            NetWeight.Text = snapshot.NetWeight;
+            Sugar.Text = snapshot.Sugar;
+            Salt.Text = snapshot.Salt;
+            Fat.Text = snapshot.Fat;
+            Mrp.Text = snapshot.Mrp;
+            Importer.Text = snapshot.Importer;
+            Copies.Text = snapshot.Copies;
+            if (snapshot.CategoryIndex >= 0 && snapshot.CategoryIndex < ProductCategory.Items.Count)
+                ProductCategory.SelectedIndex = snapshot.CategoryIndex;
+            PrintMfd.IsChecked = snapshot.PrintMfd;
+            PrintExpiry.IsChecked = snapshot.PrintExpiry;
+            PrintBatch.IsChecked = snapshot.PrintBatch;
+            PrintNetWeight.IsChecked = snapshot.PrintNetWeight;
+            LabelWidthInput.Text = snapshot.LabelWidth;
+            LabelHeightInput.Text = snapshot.LabelHeight;
+            if (snapshot.PaperIndex >= 0 && snapshot.PaperIndex < LabelPaperSize.Items.Count)
+                LabelPaperSize.SelectedIndex = snapshot.PaperIndex;
+            if (snapshot.SelectedProductIndex >= 0 && snapshot.SelectedProductIndex < ProductsGrid.Items.Count)
+                ProductsGrid.SelectedIndex = snapshot.SelectedProductIndex;
+            if (snapshot.WindowWidth >= MinWidth && snapshot.WindowWidth <= 10000) Width = snapshot.WindowWidth;
+            if (snapshot.WindowHeight >= MinHeight && snapshot.WindowHeight <= 10000) Height = snapshot.WindowHeight;
+            WindowState = snapshot.IsMaximized ? WindowState.Maximized : WindowState.Normal;
+
+            var page = snapshot.LastPage;
+            var allowedPages = new[] { "Dashboard", "Products", "Designer", "Templates", "Print", "Import", "Settings" };
+            if (allowedPages.Contains(page, StringComparer.Ordinal))
+                ShowPage(page);
+
+            ProductStatus.Text = $"Recovered your last working session ({snapshot.SavedUtc.ToLocalTime():g}).";
+        }
+        catch (Exception ex)
+        {
+            ProductStatus.Text = "A previous session checkpoint could not be restored. Your saved products remain safe.";
+            System.Diagnostics.Debug.WriteLine($"RLM session recovery failed: {ex}");
+        }
+    }
+
+    private static string GetSessionPath() => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "Razeen Secure Solution", "RSS Label Maker", "session-recovery.json");
+
+    private sealed class SessionSnapshot
+    {
+        public DateTimeOffset SavedUtc { get; set; }
+        public string LastPage { get; set; } = "Dashboard";
+        public string English { get; set; } = "";
+        public string Sinhala { get; set; } = "";
+        public string Tamil { get; set; } = "";
+        public string Mfd { get; set; } = "";
+        public string Expiry { get; set; } = "";
+        public string Batch { get; set; } = "";
+        public string NetWeight { get; set; } = "";
+        public string Sugar { get; set; } = "";
+        public string Salt { get; set; } = "";
+        public string Fat { get; set; } = "";
+        public string Mrp { get; set; } = "";
+        public string Importer { get; set; } = "";
+        public string Copies { get; set; } = "1";
+        public int CategoryIndex { get; set; }
+        public bool PrintMfd { get; set; }
+        public bool PrintExpiry { get; set; }
+        public bool PrintBatch { get; set; }
+        public bool PrintNetWeight { get; set; }
+        public string LabelWidth { get; set; } = "70";
+        public string LabelHeight { get; set; } = "45";
+        public int PaperIndex { get; set; }
+        public int SelectedProductIndex { get; set; } = -1;
+        public double WindowWidth { get; set; }
+        public double WindowHeight { get; set; }
+        public bool IsMaximized { get; set; }
+    }
+
     private void Nav_Click(object sender, RoutedEventArgs e)
     {
         if (sender is Button button && button.Tag is string page)
@@ -434,6 +618,7 @@ public partial class MainWindow : Window
 
     private void ShowPage(string page)
     {
+        _lastActivePage = page;
         DashboardPage.Visibility = page == "Dashboard" ? Visibility.Visible : Visibility.Collapsed;
         ProductsPage.Visibility = page == "Products" ? Visibility.Visible : Visibility.Collapsed;
         DesignerPage.Visibility = page == "Designer" ? Visibility.Visible : Visibility.Collapsed;
@@ -529,6 +714,7 @@ public partial class MainWindow : Window
             ProductCount.Text = _products.Count.ToString();
             ProductStatus.Text = "Product saved to the local SQLite database.";
             UpdateLabelPreview(product);
+            SaveSessionSnapshot();
         }
         catch (Exception ex) { ProductStatus.Text = $"Product was not saved: {ex.Message}"; }
     }
