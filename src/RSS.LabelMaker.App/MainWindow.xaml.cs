@@ -26,6 +26,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         ProductsGrid.ItemsSource = _products;
+        PrintProductsList.ItemsSource = _products;
         try
         {
             _productStore = new ProductStore();
@@ -719,11 +720,24 @@ public partial class MainWindow : Window
 
     private void PrintSelectedLabel_Click(object sender, RoutedEventArgs e) => OpenPrintPreview_Click(sender, e);
 
+    private void SelectAllPrintProducts_Click(object sender, RoutedEventArgs e)
+    {
+        foreach (var product in _products) product.IsPrintSelected = true;
+        PrintProductsList.Items.Refresh();
+    }
+
+    private void ClearPrintProducts_Click(object sender, RoutedEventArgs e)
+    {
+        foreach (var product in _products) product.IsPrintSelected = false;
+        PrintProductsList.Items.Refresh();
+    }
+
     private void OpenPrintPreview_Click(object sender, RoutedEventArgs e)
     {
-        if (ProductsGrid.SelectedItem is not ProductRow product)
+        var selectedProducts = _products.Where(p => p.IsPrintSelected).ToList();
+        if (selectedProducts.Count == 0)
         {
-            PrintStatus.Text = "Select a saved product on the Products page before opening print preview.";
+            PrintStatus.Text = "Tick one or more products in Items on This Sheet.";
             return;
         }
         if (!TryReadMillimetres(LabelWidth.Text, out var labelWidthMm) ||
@@ -736,9 +750,21 @@ public partial class MainWindow : Window
         if (!TryGetPrintPageSettings(out var pageWidthMm, out var pageHeightMm, out var marginLeftMm, out var marginTopMm, out var marginRightMm, out var marginBottomMm, out var horizontalGapMm, out var verticalGapMm, out var orientation))
             return;
 
-        var copies = int.TryParse(product.Copies, NumberStyles.None, CultureInfo.CurrentCulture, out var parsedCopies)
-            ? Math.Clamp(parsedCopies, 1, 500) : 1;
-        // Compare normal and 90-degree layouts, then choose the one that fits the most labels.
+        // Expand each selected product into its requested number of copies, preserving selection order.
+        var printQueue = new List<ProductRow>();
+        foreach (var product in selectedProducts)
+        {
+            var copies = int.TryParse(product.Copies, NumberStyles.None, CultureInfo.CurrentCulture, out var parsedCopies)
+                ? Math.Clamp(parsedCopies, 1, 500) : 1;
+            for (var copy = 0; copy < copies; copy++) printQueue.Add(product);
+        }
+        if (printQueue.Count > 5000)
+        {
+            PrintStatus.Text = "The selected products exceed 5,000 labels in one print job. Reduce the copy counts.";
+            return;
+        }
+
+        // Compare normal and 90-degree layouts, then choose the orientation that fits most labels.
         var printableWidthMm = pageWidthMm - marginLeftMm - marginRightMm;
         var printableHeightMm = pageHeightMm - marginTopMm - marginBottomMm;
         var normalColumns = (int)Math.Floor((printableWidthMm + horizontalGapMm) / (labelWidthMm + horizontalGapMm));
@@ -755,26 +781,28 @@ public partial class MainWindow : Window
         var perPage = rotated ? rotatedCount : normalCount;
         if (perPage < 1)
         {
-            PrintStatus.Text = "The selected label does not fit inside the page margins, even after 90° rotation. Reduce the label size or margins.";
+            PrintStatus.Text = "The selected label does not fit inside the page margins, even after 90° rotation.";
             return;
         }
-        // Centre the chosen grid in the printable area.
         var usedWidthMm = columns * footprintWidthMm + Math.Max(0, columns - 1) * horizontalGapMm;
         var usedHeightMm = rows * footprintHeightMm + Math.Max(0, rows - 1) * verticalGapMm;
         var startLeftMm = marginLeftMm + (printableWidthMm - usedWidthMm) / 2m;
         var startTopMm = marginTopMm + (printableHeightMm - usedHeightMm) / 2m;
-        var pageCount = (int)Math.Ceiling(copies / (double)perPage);
+        var pageCount = (int)Math.Ceiling(printQueue.Count / (double)perPage);
         var pages = new List<DrawingVisual>();
         for (var page = 0; page < pageCount; page++)
-            pages.Add(BuildSheetVisual(product, pageWidthMm, pageHeightMm, labelWidthMm, labelHeightMm,
-                startLeftMm, startTopMm, horizontalGapMm, verticalGapMm, Math.Min(perPage, copies - page * perPage), columns, rotated));
+        {
+            var pageProducts = printQueue.Skip(page * perPage).Take(perPage).ToList();
+            pages.Add(BuildSheetVisual(pageProducts, pageWidthMm, pageHeightMm, labelWidthMm, labelHeightMm,
+                startLeftMm, startTopMm, horizontalGapMm, verticalGapMm, pageProducts.Count, columns, rotated));
+        }
 
-        PrintLayoutSummary.Text = $"{pageWidthMm:0.##} × {pageHeightMm:0.##} mm · {orientation}\n{columns} columns × {rows} rows · {(rotated ? "90° rotated labels" : "normal labels")} · auto-centred\n{perPage} labels per page · {pageCount} page(s)\n{copies} total copies";
-        var preview = new PrintPreviewWindow(pages, pageWidthMm, pageHeightMm, copies, perPage, () => PrintSheetVisuals(pages, pageWidthMm, pageHeightMm, orientation, PrinterList.SelectedItem?.ToString()));
+        PrintLayoutSummary.Text = $"{pageWidthMm:0.##} × {pageHeightMm:0.##} mm · {orientation}\n{columns} columns × {rows} rows · {(rotated ? "90° rotated labels" : "normal labels")} · auto-centred\n{perPage} labels per page · {pageCount} page(s)\n{selectedProducts.Count} different products · {printQueue.Count} total labels";
+        var preview = new PrintPreviewWindow(pages, pageWidthMm, pageHeightMm, printQueue.Count, perPage,
+            () => PrintSheetVisuals(pages, pageWidthMm, pageHeightMm, orientation, PrinterList.SelectedItem?.ToString()));
         preview.Owner = this;
         preview.ShowDialog();
-
-        PrintStatus.Text = "Preview is ready. Check page alignment before printing.";
+        PrintStatus.Text = "Mixed-product preview is ready. Check each label before printing.";
     }
 
     private bool TryGetPrintPageSettings(out decimal pageWidthMm, out decimal pageHeightMm, out decimal marginLeftMm, out decimal marginTopMm, out decimal marginRightMm, out decimal marginBottomMm, out decimal horizontalGapMm, out decimal verticalGapMm, out PageOrientation orientation)
@@ -814,7 +842,7 @@ public partial class MainWindow : Window
         return true;
     }
 
-    private DrawingVisual BuildSheetVisual(ProductRow product, decimal pageWidthMm, decimal pageHeightMm,
+    private DrawingVisual BuildSheetVisual(IReadOnlyList<ProductRow> products, decimal pageWidthMm, decimal pageHeightMm,
         decimal labelWidthMm, decimal labelHeightMm, decimal marginLeftMm, decimal marginTopMm,
         decimal horizontalGapMm, decimal verticalGapMm, int labelCount, int columns, bool rotateLabels)
     {
@@ -850,7 +878,7 @@ public partial class MainWindow : Window
             }
             // Clip all artwork, including the watermark, to this individual label.
             dc.PushClip(new RectangleGeometry(new Rect(0, 0, labelWidth, labelHeight)));
-            DrawProductLabel(dc, product, labelWidth, labelHeight);
+            DrawProductLabel(dc, products[i], labelWidth, labelHeight);
             dc.Pop(); // label clip
             if (rotateLabels) dc.Pop(); // rotation
             dc.Pop(); // label position
@@ -1147,6 +1175,7 @@ public partial class MainWindow : Window
         public string PerPiecePricingMode { get; init; } = "Automatic";
         public string ManualPerPiecePrice { get; init; } = "";
         public string Copies { get; init; } = "1";
+        public bool IsPrintSelected { get; set; }
     }
 
     private sealed class ProductStore
