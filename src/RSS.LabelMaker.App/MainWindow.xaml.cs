@@ -13,11 +13,25 @@ public partial class MainWindow : Window
 {
     private readonly ObservableCollection<ProductRow> _products = new();
     private WatermarkStore? _watermarkStore;
+    private ProductStore? _productStore;
 
     public MainWindow()
     {
         InitializeComponent();
         ProductsGrid.ItemsSource = _products;
+        try
+        {
+            _productStore = new ProductStore();
+            foreach (var product in _productStore.Load())
+                _products.Add(product);
+            ProductCount.Text = _products.Count.ToString();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this,
+                $"Local product storage could not be opened. Existing products cannot be loaded or saved until the database is available. {ex.Message}",
+                "Product storage warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
         WatermarkOpacitySlider.Value = 0.20;
         WatermarkOpacityValue.Text = "20%";
         try
@@ -99,7 +113,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        _products.Add(new ProductRow
+        var product = new ProductRow
         {
             English = EnglishName.Text.Trim(),
             Sinhala = SinhalaName.Text.Trim(),
@@ -115,10 +129,29 @@ public partial class MainWindow : Window
             Sugar = Sugar.Text.Trim(),
             Salt = Salt.Text.Trim(),
             Fat = Fat.Text.Trim(),
-            Mrp = Mrp.Text.Trim()
-        });
-        ProductCount.Text = _products.Count.ToString();
-        ProductStatus.Text = "Added to the current session. Local database persistence is not implemented yet.";
+            Mrp = Mrp.Text.Trim(),
+            Importer = Importer.Text.Trim(),
+            Copies = Copies.Text.Trim()
+        };
+
+        if (_productStore is null)
+        {
+            ProductStatus.Text = "Product was not saved: local database is unavailable.";
+            return;
+        }
+
+        try
+        {
+            _productStore.Save(product);
+            _products.Add(product);
+            ProductCount.Text = _products.Count.ToString();
+            ProductStatus.Text = "Product saved to the local database.";
+        }
+        catch (Exception ex)
+        {
+            ProductStatus.Text = $"Product could not be saved: {ex.Message}";
+            return;
+        }
         UpdatePreview();
     }
 
@@ -302,6 +335,7 @@ public partial class MainWindow : Window
 
     private sealed class ProductRow
     {
+        public string Id { get; init; } = Guid.NewGuid().ToString("N");
         public string English { get; init; } = "";
         public string Sinhala { get; init; } = "";
         public string Tamil { get; init; } = "";
@@ -317,5 +351,76 @@ public partial class MainWindow : Window
         public string Salt { get; init; } = "";
         public string Fat { get; init; } = "";
         public string Mrp { get; init; } = "";
+        public string Importer { get; init; } = "";
+        public string Copies { get; init; } = "1";
+    }
+
+    private sealed class ProductStore
+    {
+        private readonly string _connectionString;
+
+        public ProductStore()
+        {
+            var folder = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "Razeen Secure Solution", "RSS Label Maker");
+            Directory.CreateDirectory(folder);
+            _connectionString = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder
+            {
+                DataSource = Path.Combine(folder, "rss-label-maker.db"),
+                Mode = Microsoft.Data.Sqlite.SqliteOpenMode.ReadWriteCreate
+            }.ToString();
+
+            using var connection = OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                CREATE TABLE IF NOT EXISTS Products (
+                    Id TEXT NOT NULL PRIMARY KEY,
+                    DataJson TEXT NOT NULL,
+                    CreatedUtc TEXT NOT NULL
+                );
+                """;
+            command.ExecuteNonQuery();
+        }
+
+        public List<ProductRow> Load()
+        {
+            var products = new List<ProductRow>();
+            using var connection = OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = "SELECT DataJson FROM Products ORDER BY CreatedUtc, Id;";
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                var json = reader.GetString(0);
+                var product = System.Text.Json.JsonSerializer.Deserialize<ProductRow>(json);
+                if (product is not null)
+                    products.Add(product);
+            }
+            return products;
+        }
+
+        public void Save(ProductRow product)
+        {
+            ArgumentNullException.ThrowIfNull(product);
+            var json = System.Text.Json.JsonSerializer.Serialize(product);
+            using var connection = OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                INSERT INTO Products (Id, DataJson, CreatedUtc)
+                VALUES ($id, $json, $createdUtc);
+                """;
+            command.Parameters.AddWithValue("$id", product.Id);
+            command.Parameters.AddWithValue("$json", json);
+            command.Parameters.AddWithValue("$createdUtc", DateTime.UtcNow.ToString("O"));
+            command.ExecuteNonQuery();
+        }
+
+        private Microsoft.Data.Sqlite.SqliteConnection OpenConnection()
+        {
+            var connection = new Microsoft.Data.Sqlite.SqliteConnection(_connectionString);
+            connection.Open();
+            return connection;
+        }
     }
 }
