@@ -752,10 +752,11 @@ public partial class MainWindow : Window
             pages.Add(BuildSheetVisual(product, pageWidthMm, pageHeightMm, labelWidthMm, labelHeightMm,
                 marginLeftMm, marginTopMm, horizontalGapMm, verticalGapMm, Math.Min(perPage, copies - page * perPage), columns));
 
+        PrintLayoutSummary.Text = $"{pageWidthMm:0.##} × {pageHeightMm:0.##} mm · {orientation}\n{columns} columns × {rows} rows\n{perPage} labels per page · {pageCount} page(s)\n{copies} total copies";
         var preview = new PrintPreviewWindow(pages, pageWidthMm, pageHeightMm, copies, perPage, () => PrintSheetVisuals(pages, pageWidthMm, pageHeightMm, orientation, PrinterList.SelectedItem?.ToString()));
         preview.Owner = this;
         preview.ShowDialog();
-        PrintLayoutSummary.Text = $"{pageWidthMm:0.##} × {pageHeightMm:0.##} mm · {orientation}\n{columns} columns × {rows} rows\n{perPage} labels per page · {pageCount} page(s)\n{copies} total copies";
+
         PrintStatus.Text = "Preview is ready. Check page alignment before printing.";
     }
 
