@@ -117,7 +117,7 @@ public partial class MainWindow : Window
         PageTitle.Text = page switch
         {
             "Designer" => "Label Designer",
-            "Products" => "Products",
+            "Products" => "Items Manager",
             "Templates" => "Templates",
             "Print" => "Print Manager",
             "Import" => "Import / Export",
@@ -130,7 +130,7 @@ public partial class MainWindow : Window
         PageSubtitle.Text = page switch
         {
             "Designer" => "Edit your food label layout and sheet dimensions",
-            "Products" => "Manage product names, dates, prices and nutrition values",
+            "Products" => "Add, search, edit and manage product records; import or export Excel workbooks",
             "Templates" => "Choose a starting layout for your labels",
             "Print" => "Select a Windows printer and prepare accurate output",
             "Import" => "Bring product data in and export finished labels",
