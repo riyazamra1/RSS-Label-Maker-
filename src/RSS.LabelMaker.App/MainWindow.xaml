@@ -163,10 +163,13 @@
       <DockPanel>
        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,12">
        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+        <TextBox x:Name="ProductSearch" Width="170" ToolTip="Search products by name, batch or MRP" TextChanged="ProductSearch_TextChanged" Margin="0,0,8,0" VerticalContentAlignment="Center"/>
+        <Button Content="Import Excel" Click="ImportProductsExcel_Click" Padding="12,6" Margin="0,0,8,0"/>
+        <Button Content="Export Excel" Click="ExportProductsExcel_Click" Padding="12,6" Margin="0,0,8,0"/>
         <Button Content="Edit selected" Click="EditProduct_Click" Padding="12,6" Margin="0,0,8,0"/>
         <Button Content="Delete selected" Click="DeleteProduct_Click" Padding="12,6"/>
        </StackPanel>
-       <TextBlock Text="PRODUCT LIST" FontSize="11" FontWeight="Bold" Foreground="#77808C" VerticalAlignment="Center"/>
+       <TextBlock Text="ITEMS MANAGER" FontSize="11" FontWeight="Bold" Foreground="#77808C" VerticalAlignment="Center"/>
       </DockPanel>
        <DataGrid x:Name="ProductsGrid" AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True" HeadersVisibility="Column" GridLinesVisibility="Horizontal" BorderThickness="0">
         <DataGrid.Columns>
