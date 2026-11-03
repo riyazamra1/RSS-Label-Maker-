@@ -738,21 +738,29 @@ public partial class MainWindow : Window
 
         var copies = int.TryParse(product.Copies, NumberStyles.None, CultureInfo.CurrentCulture, out var parsedCopies)
             ? Math.Clamp(parsedCopies, 1, 500) : 1;
-        var columns = (int)Math.Floor((pageWidthMm - marginLeftMm - marginRightMm + horizontalGapMm) / (labelWidthMm + horizontalGapMm));
-        var rows = (int)Math.Floor((pageHeightMm - marginTopMm - marginBottomMm + verticalGapMm) / (labelHeightMm + verticalGapMm));
+        // Fit the largest regular grid inside the user-defined printable area.
+        var printableWidthMm = pageWidthMm - marginLeftMm - marginRightMm;
+        var printableHeightMm = pageHeightMm - marginTopMm - marginBottomMm;
+        var columns = (int)Math.Floor((printableWidthMm + horizontalGapMm) / (labelWidthMm + horizontalGapMm));
+        var rows = (int)Math.Floor((printableHeightMm + verticalGapMm) / (labelHeightMm + verticalGapMm));
         if (columns < 1 || rows < 1)
         {
             PrintStatus.Text = "The selected label does not fit inside the page margins. Reduce the label size or margins.";
             return;
         }
         var perPage = columns * rows;
+        // Centre the complete grid in the printable area so unused space is balanced on all sides.
+        var usedWidthMm = columns * labelWidthMm + Math.Max(0, columns - 1) * horizontalGapMm;
+        var usedHeightMm = rows * labelHeightMm + Math.Max(0, rows - 1) * verticalGapMm;
+        var startLeftMm = marginLeftMm + (printableWidthMm - usedWidthMm) / 2m;
+        var startTopMm = marginTopMm + (printableHeightMm - usedHeightMm) / 2m;
         var pageCount = (int)Math.Ceiling(copies / (double)perPage);
         var pages = new List<DrawingVisual>();
         for (var page = 0; page < pageCount; page++)
             pages.Add(BuildSheetVisual(product, pageWidthMm, pageHeightMm, labelWidthMm, labelHeightMm,
-                marginLeftMm, marginTopMm, horizontalGapMm, verticalGapMm, Math.Min(perPage, copies - page * perPage), columns));
+                startLeftMm, startTopMm, horizontalGapMm, verticalGapMm, Math.Min(perPage, copies - page * perPage), columns));
 
-        PrintLayoutSummary.Text = $"{pageWidthMm:0.##} × {pageHeightMm:0.##} mm · {orientation}\n{columns} columns × {rows} rows\n{perPage} labels per page · {pageCount} page(s)\n{copies} total copies";
+        PrintLayoutSummary.Text = $"{pageWidthMm:0.##} × {pageHeightMm:0.##} mm · {orientation}\n{columns} columns × {rows} rows (auto-centred)\n{perPage} labels per page · {pageCount} page(s)\n{copies} total copies";
         var preview = new PrintPreviewWindow(pages, pageWidthMm, pageHeightMm, copies, perPage, () => PrintSheetVisuals(pages, pageWidthMm, pageHeightMm, orientation, PrinterList.SelectedItem?.ToString()));
         preview.Owner = this;
         preview.ShowDialog();
