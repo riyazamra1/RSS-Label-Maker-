@@ -501,7 +501,7 @@ public partial class MainWindow : Window
                 (English, Sinhala, Tamil, Mfd, Expiry, Batch, NetWeight, Sugar, Salt, Fat, Mrp, Importer, Copies,
                  PrintMfd, PrintExpiry, PrintBatch, PrintNetWeight, CreatedUtc)
                 VALUES
-                ($english, $sinhala, $tamil, $mfd, $expiry, $weight, $sugar, $salt, $fat, $mrp, $importer, $copies,
+                ($english, $sinhala, $tamil, $mfd, $expiry, $batch, $weight, $sugar, $salt, $fat, $mrp, $importer, $copies,
                  $printMfd, $printExpiry, $printBatch, $printWeight, $createdUtc);
                 """;
             command.Parameters.AddWithValue("$english", product.English);
