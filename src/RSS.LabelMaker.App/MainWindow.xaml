@@ -85,27 +85,27 @@
        <TextBlock Text="PRODUCT DETAILS" FontSize="11" FontWeight="Bold" Foreground="#77808C" Margin="0,0,0,12"/>
        <Grid>
         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-        <StackPanel Grid.Column="0" Margin="0,0,12,0"><TextBlock Text="Product name (English)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="EnglishName" /></StackPanel>
-        <StackPanel Grid.Column="1" Margin="0,0,12,0"><TextBlock Text="Product name (Sinhala)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="SinhalaName"/></StackPanel>
-        <StackPanel Grid.Column="2"><TextBlock Text="Product name (Tamil)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="TamilName"/></StackPanel>
+        <StackPanel Grid.Column="0" Margin="0,0,12,0"><TextBlock Text="Product name (English)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="EnglishName" TextChanged="ProductField_TextChanged"/></StackPanel>
+        <StackPanel Grid.Column="1" Margin="0,0,12,0"><TextBlock Text="Product name (Sinhala)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="SinhalaName" TextChanged="ProductField_TextChanged"/></StackPanel>
+        <StackPanel Grid.Column="2"><TextBlock Text="Product name (Tamil)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="TamilName" TextChanged="ProductField_TextChanged"/></StackPanel>
        </Grid>
        <Grid Margin="0,12,0,0">
         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-        <StackPanel Grid.Column="0" Margin="0,0,10,0"><TextBlock Text="M.F.D" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="Mfd"/></StackPanel>
-        <StackPanel Grid.Column="1" Margin="0,0,10,0"><TextBlock Text="EXP.D" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="Expiry"/></StackPanel>
-        <StackPanel Grid.Column="2" Margin="0,0,10,0"><TextBlock Text="B.No" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="Batch"/></StackPanel>
-        <StackPanel Grid.Column="3"><TextBlock Text="N.Wt" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="NetWeight" Text=""/></StackPanel>
+        <StackPanel Grid.Column="0" Margin="0,0,10,0"><TextBlock Text="M.F.D" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="Mfd" TextChanged="ProductField_TextChanged"/><CheckBox x:Name="MfdPrintOnPack" Content="Print on pack" FontSize="10" Margin="0,4,0,0" Checked="PrintOnPack_Changed" Unchecked="PrintOnPack_Changed"/></StackPanel>
+        <StackPanel Grid.Column="1" Margin="0,0,10,0"><TextBlock Text="EXP.D" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="Expiry" TextChanged="ProductField_TextChanged"/><CheckBox x:Name="ExpiryPrintOnPack" Content="Print on pack" FontSize="10" Margin="0,4,0,0" Checked="PrintOnPack_Changed" Unchecked="PrintOnPack_Changed"/></StackPanel>
+        <StackPanel Grid.Column="2" Margin="0,0,10,0"><TextBlock Text="B.No" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="Batch" TextChanged="ProductField_TextChanged"/><CheckBox x:Name="BatchPrintOnPack" Content="Print on pack" FontSize="10" Margin="0,4,0,0" Checked="PrintOnPack_Changed" Unchecked="PrintOnPack_Changed"/></StackPanel>
+        <StackPanel Grid.Column="3"><TextBlock Text="N.Wt" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="NetWeight" Text="" TextChanged="ProductField_TextChanged"/><CheckBox x:Name="NetWeightPrintOnPack" Content="Print on pack" FontSize="10" Margin="0,4,0,0" Checked="PrintOnPack_Changed" Unchecked="PrintOnPack_Changed"/></StackPanel>
        </Grid>
        <Grid Margin="0,12,0,0">
         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-        <StackPanel Grid.Column="0" Margin="0,0,10,0"><TextBlock Text="Sugar (g/100g)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="Sugar"/></StackPanel>
-        <StackPanel Grid.Column="1" Margin="0,0,10,0"><TextBlock Text="Salt (g/100g)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="Salt"/></StackPanel>
-        <StackPanel Grid.Column="2" Margin="0,0,10,0"><TextBlock Text="Fat (g/100g)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="Fat"/></StackPanel>
-        <StackPanel Grid.Column="3"><TextBlock Text="M.R.P. (Rs.)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="Mrp"/></StackPanel>
+        <StackPanel Grid.Column="0" Margin="0,0,10,0"><TextBlock Text="Sugar (g/100g)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="Sugar" TextChanged="ProductField_TextChanged"/></StackPanel>
+        <StackPanel Grid.Column="1" Margin="0,0,10,0"><TextBlock Text="Salt (g/100g)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="Salt" TextChanged="ProductField_TextChanged"/></StackPanel>
+        <StackPanel Grid.Column="2" Margin="0,0,10,0"><TextBlock Text="Fat (g/100g)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="Fat" TextChanged="ProductField_TextChanged"/></StackPanel>
+        <StackPanel Grid.Column="3"><TextBlock Text="M.R.P. (Rs.)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="Mrp" TextChanged="ProductField_TextChanged"/></StackPanel>
        </Grid>
        <Grid Margin="0,12,0,0">
         <Grid.ColumnDefinitions><ColumnDefinition Width="2*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-        <StackPanel Grid.Column="0" Margin="0,0,12,0"><TextBlock Text="Import By" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="Importer"/></StackPanel>
+        <StackPanel Grid.Column="0" Margin="0,0,12,0"><TextBlock Text="Import By" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="Importer" TextChanged="ProductField_TextChanged"/></StackPanel>
         <StackPanel Grid.Column="1" Margin="0,0,12,0"><TextBlock Text="Copies" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="Copies" Text="1"/></StackPanel>
         <StackPanel Grid.Column="2" VerticalAlignment="Bottom"><Button Content="Save Product" Click="SaveProduct_Click" Background="#C69A43" Foreground="#20242B" Padding="18,9"/></StackPanel>
        </Grid>
@@ -134,8 +134,8 @@
       <StackPanel>
        <TextBlock Text="LABEL SETTINGS" FontWeight="Bold" FontSize="11" Foreground="#77808C" Margin="0,0,0,14"/>
        <TextBlock Text="Template" FontSize="11"/><ComboBox SelectedIndex="0" Margin="0,5,0,12"><ComboBoxItem Content="Food Product Label"/><ComboBoxItem Content="General Product Label"/><ComboBoxItem Content="Barcode &amp; Price Label"/></ComboBox>
-       <TextBlock Text="Label width (mm)" FontSize="11"/><TextBox Text="70" Margin="0,5,0,12"/>
-       <TextBlock Text="Label height (mm)" FontSize="11"/><TextBox Text="45" Margin="0,5,0,12"/>
+       <TextBlock Text="Label width (mm)" FontSize="11"/><TextBox x:Name="LabelWidth" Text="70" Margin="0,5,0,12"/>
+       <TextBlock Text="Label height (mm)" FontSize="11"/><TextBox x:Name="LabelHeight" Text="45" Margin="0,5,0,12"/>
        <TextBlock Text="Paper" FontSize="11"/><ComboBox SelectedIndex="0" Margin="0,5,0,12"><ComboBoxItem Content="A4 — 210 × 297 mm"/><ComboBoxItem Content="A5 — 148 × 210 mm"/><ComboBoxItem Content="Letter"/></ComboBox>
        <TextBlock Text="Layout" FontSize="11"/><ComboBox SelectedIndex="0" Margin="0,5,0,12"><ComboBoxItem Content="Automatic rows &amp; columns"/><ComboBoxItem Content="Manual rows &amp; columns"/></ComboBox>
        <Button Content="Apply dimensions" Click="ApplyLayout_Click" Background="#C69A43" Margin="0,8,0,0"/>
@@ -145,7 +145,7 @@
      <Border Grid.Column="1" Background="#E9EBEE" CornerRadius="8" Padding="24">
       <Grid>
        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top"><TextBlock Text="DESIGN CANVAS" FontWeight="Bold" FontSize="11" Foreground="#77808C"/><TextBlock Text="   ·   100%" FontSize="11" Foreground="#77808C"/></StackPanel>
-       <Border Width="490" Height="315" Background="White" BorderBrush="#20242B" BorderThickness="1.2" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="14">
+       <Border x:Name="PreviewLabelBorder" Width="490" Height="315" Background="White" BorderBrush="#20242B" BorderThickness="1.2" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="14">
         <Grid>
          <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
          <TextBlock x:Name="PreviewEnglish" Text="PRODUCT NAME" Foreground="#C83232" FontSize="23" FontWeight="Bold" HorizontalAlignment="Center"/>
@@ -153,16 +153,18 @@
          <Grid Grid.Row="2">
           <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
           <StackPanel FontSize="12" VerticalAlignment="Center">
-           <TextBlock Text="M.F.D :  —"/><TextBlock Text="EXP.D :  —"/><TextBlock Text="B.No :  —"/><TextBlock Text="N.Wt :  —"/>
+           <TextBlock x:Name="PreviewMfd" Text="M.F.D :  —"/>
+           <TextBlock x:Name="PreviewExpiry" Text="EXP.D :  —"/>
+           <TextBlock x:Name="PreviewBatch" Text="B.No :  —"/>
+           <TextBlock x:Name="PreviewNetWeight" Text="N.Wt :  —"/>
           </StackPanel>
-          <TextBlock Grid.Column="1" Text="} Printed On Pack" FontSize="10" VerticalAlignment="Center" Foreground="#555"/>
          </Grid>
-         <TextBlock Grid.Row="3" Text="M.R.P. (Rs.)  —" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,8"/>
+         <TextBlock x:Name="PreviewMrp" Grid.Row="3" Text="M.R.P. (Rs.)  —" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,8"/>
          <Grid Grid.Row="4">
           <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-          <Border Background="#C94343" Margin="1" Padding="5"><StackPanel><TextBlock Text="SUGAR" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" FontSize="11"/><TextBlock Text="සීනි  •  சர்க்கரை" Foreground="White" FontSize="8" HorizontalAlignment="Center"/><TextBlock Text="— g/100g" Background="White" Foreground="#222" HorizontalAlignment="Stretch" TextAlignment="Center" Padding="2"/></StackPanel></Border>
-          <Border Grid.Column="1" Background="#458A58" Margin="1" Padding="5"><StackPanel><TextBlock Text="SALT" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" FontSize="11"/><TextBlock Text="ලුණු  •  உப்பு" Foreground="White" FontSize="8" HorizontalAlignment="Center"/><TextBlock Text="— g/100g" Background="White" Foreground="#222" HorizontalAlignment="Stretch" TextAlignment="Center" Padding="2"/></StackPanel></Border>
-          <Border Grid.Column="2" Background="#D99B37" Margin="1" Padding="5"><StackPanel><TextBlock Text="FAT" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" FontSize="11"/><TextBlock Text="මේදය  •  கொழுப்பு" Foreground="White" FontSize="8" HorizontalAlignment="Center"/><TextBlock Text="— g/100g" Background="White" Foreground="#222" HorizontalAlignment="Stretch" TextAlignment="Center" Padding="2"/></StackPanel></Border>
+          <Border Background="#C94343" Margin="1" Padding="5"><StackPanel><TextBlock Text="SUGAR" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" FontSize="11"/><TextBlock Text="සීනි  •  சர்க்கரை" Foreground="White" FontSize="8" HorizontalAlignment="Center"/><TextBlock x:Name="PreviewSugar" Text="— g/100g" Background="White" Foreground="#222" HorizontalAlignment="Stretch" TextAlignment="Center" Padding="2"/></StackPanel></Border>
+          <Border Grid.Column="1" Background="#458A58" Margin="1" Padding="5"><StackPanel><TextBlock Text="SALT" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" FontSize="11"/><TextBlock Text="ලුණු  •  உப்பு" Foreground="White" FontSize="8" HorizontalAlignment="Center"/><TextBlock x:Name="PreviewSalt" Text="— g/100g" Background="White" Foreground="#222" HorizontalAlignment="Stretch" TextAlignment="Center" Padding="2"/></StackPanel></Border>
+          <Border Grid.Column="2" Background="#D99B37" Margin="1" Padding="5"><StackPanel><TextBlock Text="FAT" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" FontSize="11"/><TextBlock Text="මේදය  •  கொழுப்பு" Foreground="White" FontSize="8" HorizontalAlignment="Center"/><TextBlock x:Name="PreviewFat" Text="— g/100g" Background="White" Foreground="#222" HorizontalAlignment="Stretch" TextAlignment="Center" Padding="2"/></StackPanel></Border>
          </Grid>
         </Grid>
        </Border>
