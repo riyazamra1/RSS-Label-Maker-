@@ -52,10 +52,11 @@ The existing customer registration/session routes currently do not provide the c
    - Add owner-scoped invitations, acceptance, revocation, role assignment and seat enforcement.
    - Shared users use their own central RSS accounts. A user seat and a PC device slot are separate limits.
 7. **Daily label quota**
-   - Add an atomic server-side usage ledger keyed by account, project and service-local calendar date.
-   - Count completed print operations / labels according to a clearly documented rule. Preview and cancelled jobs do not count.
+   - Add an atomic server-side usage ledger keyed by RSS Core account, project and the account's configured calendar date.
+   - **Free limit: 20 labels per account per calendar day**, shared across all activated PCs and all shared users in that account. It is not a per-device or per-user allowance.
+   - Count each label copy in a successfully submitted print job individually. Preview actions do not count. Cancelled jobs and jobs that fail before the Windows print spooler accepts them do not count. Spooler acceptance proves job submission, not physical paper output.
    - Use idempotency keys per print job to prevent retries or replay from consuming quota multiple times.
-   - Return used, remaining, limit and next reset timestamp. Define timezone centrally (default Asia/Colombo only if RSS Core confirms this project setting).
+   - Return used, remaining, limit and next reset timestamp. RSS Core must define the account/project timezone centrally; do not rely on the PC's mutable local clock.
    - Support signed bounded offline quota grants and reconcile usage events when reconnected. Define behavior for clock rollback, duplicate events and offline grace expiry.
 8. **Backup metadata**
    - Store account/workspace ownership, Drive provider, opaque Drive file ID, archive version, checksum, size and last backup/restore timestamps as metadata only.
@@ -89,15 +90,14 @@ The existing customer registration/session routes currently do not provide the c
 
 ## Free plan restrictions confirmed so far
 
-- Configurable daily label-print quota.
+- **20 printed labels per RSS Core account per calendar day**, shared across all activated PCs and shared users. Count copies in successfully submitted print jobs; previews, cancelled jobs and failures before spooler acceptance do not count.
 - No PDF export.
 - No saving reusable Import By / Distributed By master profiles.
 - Other restrictions are server-controlled feature flags and must be approved in a plan matrix before release. Do not silently hard-code additional limits.
 
 ## Unresolved product settings — do not guess
 
-- Free daily print quota (number of labels per account per day).
-- Whether quota is counted per account, workspace or device (recommended: account/workspace, shared across activated devices).
+- Confirm the account/project calendar timezone used to determine the daily quota reset.
 - Exact paid device options (single PC and multi-PC counts).
 - Exact shared-user seat options and role set.
 - Premium feature matrix beyond PDF export, reusable Import By / Distributed By profiles, backup/restore and multi-device/shared users.
