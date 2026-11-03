@@ -4,7 +4,7 @@
 **Publisher:** Razeen Secure Solution  
 **Repository:** riyazamra1/RSS-Label-Maker-  
 **Target OS:** Windows 10 and Windows 11  
-**Distribution:** Free tier + RSS Core-managed licensed subscriptions  
+**Distribution:** 14-day Premium trial + RSS Core-managed annual/lifetime licenses  
 **Specification status:** Approved requirements baseline  
 **Version target:** 1.0.0
 
@@ -21,8 +21,8 @@ The reference is a layout guide, not a fixed-size template. Users must be able t
 - SQLite local database.
 - Mandatory account registration and email verification through RSS Core before first use.
 - RSS Core is the central user database, identity provider, license authority and subscription/entitlement authority. Do not create a separate RSS Label Maker user database or standalone authentication backend.
-- Free tier is available after registration and permits **20 printed labels per RSS Core account per calendar day**, shared across all activated PCs and shared users, subject to the Free feature restrictions. Paid plans are activated by redeeming a license key issued/validated by RSS Core.
-- License entitlements govern device count, shared-user seats, feature access, daily usage limits, cloud backup and restore.
+- A verified account receives one **14-day Premium trial** with an RSS TRIAL watermark on every printed/PDF page. There is no permanent Free plan. After trial expiry, continued printing and Premium features require an active paid license validated by RSS Core.
+- License entitlements govern license term, device count, network user seats, feature access, trial watermark state, cloud backup and restore.
 - Any printer installed and usable through the Windows printing subsystem.
 - Local label work is stored in SQLite. Offline access is governed by a cached, signed, time-bounded RSS Core entitlement; usage limits and revocations must reconcile with RSS Core when online.
 - Online translation is used only to generate Sinhala and Tamil product-name suggestions from an English product name. Translation results are cached locally.
@@ -34,51 +34,71 @@ The reference is a layout guide, not a fixed-size template. Users must be able t
 ### Central account database and identity
 - The user must register and verify their email before entering RSS Label Maker.
 - All account/profile details must be stored in the existing RSS Core user database. RSS Label Maker must not maintain a separate user/account database.
-- RSS Core is the source of truth for account identity, email verification, account status, license keys, subscription entitlements, device activations, shared-user membership, usage quotas and audit events.
+- RSS Core is the source of truth for account identity, email verification, account status, trial eligibility/expiry, license keys, subscription entitlements, device activations, shared-user membership and audit events.
 - The desktop app communicates with RSS Core over HTTPS using documented, versioned APIs. Email verification and password recovery emails are sent by RSS Core's existing transactional email mechanism; no separate RSS Label Maker Resend backend or D1 account database.
 - Keep product records, label designs, templates, watermark assets and print jobs local by default. Cloud backup content is stored in the user's authorized Google Drive unless a later approved RSS Core storage feature is specified.
 
 ### License and subscription model
-- A registered user receives the RSS Label Maker Free entitlement automatically. The Free entitlement has a configurable daily label-print quota and feature restrictions.
-- Paid access is activated by entering a license key in the app. The key is validated and redeemed by RSS Core; the desktop app must never decide that a key is valid based only on local string format.
-- RSS Core returns a signed entitlement describing product/app, account, plan, status, validity period, allowed device activations, allowed shared-user seats, daily print quota, feature flags and cloud-backup permissions.
-- The established RSS Core payment architecture is retained: RSS Core owns the Payments module and integrates Payments.lk hosted checkout; no separate RSS Pay app/backend. Payment credentials remain server-side. Entitlements are activated only after a verified, idempotent payment webhook, never from a browser return URL.
-- Previously accepted commercial baseline: a one-time payment for one year of RSS Premium entitlement (not recurring monthly billing). The actual price remains unselected. Do not invent prices or imply auto-renewal.
-- License key redemption, renewal/replacement, expiry, refund/revocation and device deactivation are handled by RSS Core.
-- Show plan name, license status, expiry/valid-through date, active devices, available device slots, shared-user seats and current day's usage in the app.
+- A verified RSS Core account receives one 14-day Premium trial, starting at the first successful verified RLM activation. RSS Core enforces trial eligibility centrally; reinstalling or creating another local device profile must not reset it.
+- Trial users receive the full Premium feature set for 14 calendar days, including PDF export, import/export workflows, backup/restore where available and Premium print-quality controls. Every printed page and exported PDF page must carry a visible RSS Label Maker TRIAL watermark.
+- There is no permanent Free plan and no daily 20-label quota.
+- After trial expiry, block new print jobs, PDF export and Premium-only operations until a paid license is activated. Preserve all local products, templates, designs and settings. Never silently convert the account to a permanent Free plan or delete customer data.
+- Paid access is activated by entering a license key in the app. RSS Core validates and redeems the key; the desktop app must never decide that a key is valid based only on local string format.
+- RSS Core returns a signed entitlement describing product/app, account, plan, status, license model (trial, annual or lifetime), validity period, allowed device activations, allowed network-user seats, feature flags, trial watermark state and cloud-backup permissions.
+- RSS Core owns the Payments module and integrates Payments.lk hosted checkout; no separate RSS Pay app/backend. Payment credentials remain server-side. Entitlements are activated only after a verified, idempotent payment webhook, never from a browser return URL.
+- Paid plans support both annual (12-month) and lifetime (one-time) licenses in LKR and USD. No monthly recurring billing or automatic renewal is assumed.
+- License-key redemption, annual renewal/replacement, expiry, refund/revocation and device deactivation are handled by RSS Core. Lifetime entitlements do not expire, subject to legitimate refund/revocation and account-security controls.
+- Show plan name, license status, trial end or paid expiry/valid-through date, annual/lifetime term, purchase currency and price, active devices, available device slots and network-user seats in the app.
 
-### Free tier restrictions
-- Free users may print a maximum of **20 labels per RSS Core account per calendar day**. The quota is shared across every activated PC and all shared users belonging to that account; it is not a per-device or per-user allowance.
-- Count each label copy in a successfully submitted print job individually. Preview actions do not count. Cancelled jobs and jobs that fail before the Windows print spooler accepts them do not count. Use an idempotent print-job identifier so retries cannot double-charge. The client must explain that spooler acceptance confirms submission, not that paper physically emerged from the printer.
-- PDF export is disabled for Free.
-- Saving reusable Import By / Distributed By master profiles is disabled for Free. Product-specific importer/distributor text may be entered for an individual product only if the final plan policy permits it.
-- Additional feature restrictions must be controlled by server-provided feature flags, not hard-coded assumptions. The plan matrix must be finalized before release.
-- When a user reaches the daily quota, clearly show the reset time and offer license-key redemption / plan upgrade. Do not delete or lock existing local data.
-- Quota enforcement must be resistant to clock rollback and local database edits. The server is authoritative when online; cached signed quota grants may support a bounded offline allowance.
+### 14-day trial policy
+- The trial starts only after verified RSS Core registration and the first successful RLM activation. RSS Core is authoritative for start/end timestamps.
+- Trial duration is exactly 14 calendar days. Any future trial-policy changes must be configured centrally in RSS Core, not hard-coded in the desktop application.
+- All Premium features are enabled during the trial. A visible RSS Label Maker TRIAL watermark is mandatory on every printed page and every exported PDF page.
+- The system trial watermark is separate from the user's optional logo watermark and cannot be removed, hidden or made transparent during the trial. It must not obscure label content.
+- Render the trial watermark consistently in print preview, PDF and physical print output. The watermark must appear on each output page, not just the application screen.
+- At expiry, RSS Core marks the trial expired. The app must refresh entitlement before allowing new print/PDF operations. A cached signed entitlement may be used only within its signed validity and configured offline grace; changing the PC clock cannot extend the trial.
+- Expired trial users see a clear purchase/license-key activation path. Do not auto-create a Free entitlement, apply a permanent Free quota, delete local data or silently reset the trial.
+
+### Commercial plans and proposed pricing
+All prices below are proposals subject to RSS Core administrator configuration. They must not be hard-coded into the desktop app. Annual and lifetime prices are independent catalog values for each currency; USD is not automatically calculated from LKR exchange rates.
+
+| RLM license | Included scope | Annual LKR | Annual USD | Lifetime LKR | Lifetime USD |
+|---|---|---:|---:|---:|---:|
+| Premium — Single PC | 1 owner, 1 registered PC | 5,000 | 25 | 12,000 | 60 |
+| Premium — Shared License | 1 owner, default 3 registered PCs; same owner across devices, cloud sync, no LAN-shared workspace | 9,000 | 50 | 22,000 | 120 |
+| Premium — Multiple PC (Network) | Default 5 PCs on a shared local network, shared workspace/product data and multiple authorized users | 18,000 | 100 | 40,000 | 220 |
+
+Additional PC pricing must reconcile with the main bundles:
+- Shared License extra registered PC: annual LKR 2,000 / USD 12.50; lifetime LKR 5,000 / USD 30.
+- Multiple PC (Network) extra network PC: annual LKR 3,250 / USD 18.75; lifetime LKR 7,000 / USD 40.
+- These rates reconcile exactly: Single PC + 2 Shared License PCs equals the 3-PC Shared License bundle; Single PC + 4 Network PCs equals the 5-PC Network bundle. Do not add a separate network surcharge on top of the listed bundle.
+- Network user seats and PC slots are separate entitlements. The initial network user-seat count and any additional-user fee remain administrator-configurable; never assume one user equals one PC or invent an additional-user price.
+- RSS Core Admin can edit prices, currencies, included PC/user limits, add-on rates, trial policy, discounts, plan availability and feature entitlements. Price changes apply to future purchases only; preserve each existing customer's purchase price and license terms.
 
 ### Device identity and license activation
 - Generate a stable per-installation device ID and bind it to a privacy-preserving Windows device fingerprint. Do not transmit raw hardware serial numbers or sensitive hardware identifiers.
 - RSS Core records each activated device against the user/license and enforces the plan's device limit.
-- Single-PC license: one active PC device slot.
-- Multi-PC license: multiple device slots according to the purchased entitlement.
+- Premium Single PC: one active PC device slot.
+- Premium Shared License: one owner may register multiple PCs under the same owner account, within the purchased device limit. This is an individual multi-device license with cloud synchronization, not a LAN-shared multi-user workspace.
+- Premium Multiple PC (Network): multiple PCs connect to a shared local-network workspace and shared product data. RSS Core separately enforces network-PC and authorized-user limits. Do not treat this as the individual Shared License plan.
 - Device activation must support viewing device name/ID, last-seen time and deactivation from the account/device management UI.
 - Reinstall, hardware change, OS reset and device replacement need a documented recovery/deactivation process; do not silently create unlimited new device slots.
 - A device ID alone is not proof of license ownership. Use signed device-bound tokens and server-side activation records.
 
-### Multi-user / shared-user licensing
-- Support a license owner inviting additional RSS Core accounts as shared users, subject to the plan's shared-user seat count.
+### Multi-user / network licensing
+- The Multiple PC (Network) plan supports a license owner/business inviting additional RSS Core accounts as shared users, subject to the plan's shared-user seat count.
 - Shared users authenticate with their own verified RSS Core accounts. Never share one owner's password or license key as a common login.
 - RSS Core manages invitations, acceptance, removal, role/permission assignments and seat counts.
-- Shared-user access must be scoped to the licensed RSS Label Maker workspace/business and its permitted data. Define roles such as Owner/Admin, Editor and Print-only; permissions must be enforced by the app and RSS Core APIs where applicable.
+- Shared-user access must be scoped to the licensed RSS Label Maker network workspace/business and its permitted data. Define roles such as Owner/Admin, Editor and Print-only; permissions must be enforced by the app and RSS Core APIs where applicable.
 - Shared-user seats and PC device activations are separate entitlement counts. Do not treat one PC as one user or one user as one PC.
 
 ### Offline policy
-- A device with a valid cached signed entitlement may continue permitted local work while offline, within a bounded offline grace period and cached daily quota.
-- New registration, email verification, first activation, license-key redemption, adding a device, inviting shared users, cloud backup/restore and license changes require online RSS Core access.
-- Offline usage must be recorded locally in a tamper-evident queue and reconciled with RSS Core on reconnection. Detect duplicate/replayed usage events.
-- An offline PC cannot immediately learn of a server-side revocation, seat removal or subscription expiry. Do not claim immediate offline revocation.
-- If the offline grace period or cached quota is exhausted, block only the restricted operations; preserve access to local data and allow viewing/exporting permitted local data as plan policy defines.
-- Do not silently erase or lock customer data when a license expires.
+- A device with a valid cached signed entitlement may continue permitted local work while offline, within the configured bounded offline grace period and signed entitlement validity.
+- New registration, email verification, first activation, license-key redemption, adding a device, inviting network users, cloud backup/restore and license changes require online RSS Core access.
+- Offline activity must be recorded locally in a tamper-evident queue and reconciled with RSS Core on reconnection. Detect duplicate/replayed events.
+- An offline PC cannot immediately learn of a server-side revocation, seat removal or annual subscription expiry. Do not claim immediate offline revocation.
+- When the signed entitlement expires or the offline grace period is exhausted, block restricted printing/Premium operations; preserve access to local data and permit account/license management.
+- Do not silently erase or lock customer data when a trial or paid license expires.
 
 ### Google Drive backup and restore
 - Provide explicit Backup to Google Drive and Restore from Google Drive actions.
@@ -92,26 +112,26 @@ The reference is a layout guide, not a fixed-size template. Users must be able t
 - Google Drive backup entitlement and storage/backup limits are controlled by RSS Core plan flags. Do not claim RSS Core stores the backup payload unless separately approved.
 
 ### Security and API requirements
-- All authentication, email verification, license validation, device activation, seat management, quota checks, usage reconciliation and entitlement retrieval must go through RSS Core.
+- All authentication, email verification, trial/paid license validation, device activation, network-seat management and entitlement retrieval must go through RSS Core.
 - Desktop client stores only short-lived access credentials and a protected refresh/device credential; never store plaintext passwords or reusable bearer tokens in SQLite, logs or ordinary settings files.
 - Use TLS, strict request validation, signed short-lived access tokens, token rotation/revocation, rate limits, generic auth errors and audit logging.
 - Do not embed RSS Core secrets, Payments.lk credentials, Google client secrets or signing keys in the Windows binary.
-- RSS Core must enforce ownership and authorization for every user/license/device/seat operation. Never trust client-supplied plan names, quota values, device counts or feature flags.
+- RSS Core must enforce ownership and authorization for every user/license/device/seat operation. Never trust client-supplied plan names, trial dates, prices, currency, device counts, user seats or feature flags.
 - API failures must not corrupt local data. Preserve bounded offline operation for already-authorized devices.
 
 ### Acceptance criteria
 1. New users register and verify through RSS Core; user details appear in the RSS Core user database.
 2. No separate Label Maker account database or standalone auth Worker/D1 is used.
-3. Free plan is automatically assigned and its limit of 20 printed labels per account per calendar day is enforced across all PCs and shared users.
-4. Free plan cannot export PDF or save reusable Import By / Distributed By master profiles.
-5. License key entry calls RSS Core and activates only a valid, eligible entitlement.
-6. Single-PC and multi-PC activation limits are enforced by RSS Core using stable device IDs.
-7. Shared users authenticate separately and consume authorized seat entitlements.
-8. Offline access follows signed entitlement, grace-period and cached-quota rules.
-9. Google Drive backup and restore use secure OAuth, encrypted archives and integrity validation.
+3. RSS Core issues one 14-day Premium trial after verified registration and first RLM activation; no permanent Free plan or daily free-label quota exists.
+4. Trial enables Premium features but watermarks every printed/PDF page; after expiry, new printing and Premium operations require a paid license and local data remains intact.
+5. RSS Core validates and activates annual or lifetime license keys in LKR or USD, using the plan and price snapshot configured at purchase.
+6. Single-PC, Shared License multi-device and Multiple PC (Network) device/user limits are enforced by RSS Core.
+7. Network shared users authenticate separately and consume authorized user seats distinct from PC slots.
+8. Offline access follows signed entitlement and bounded offline-grace rules; trial expiry cannot be extended by changing the PC clock.
+9. Google Drive backup and restore use secure OAuth, encrypted archives and integrity validation, subject to entitlement.
 10. Existing local data is preserved across expiry, sign-out, network outage and restore failures.
-11. Payment fulfillment is based on verified Payments.lk webhook processing by RSS Core.
-12. Tests cover quota boundaries, day rollover, clock rollback, duplicate usage, key redemption, device replacement, seat removal, offline expiry and backup/restore integrity.
+11. Payment fulfillment is based on verified Payments.lk webhook processing by RSS Core for annual and lifetime purchases.
+12. Tests cover trial start/expiry/reinstall resistance, watermark rendering, license redemption, annual/lifetime validity, currency/price snapshots, device replacement, network seats, offline expiry and backup/restore integrity.
 
 ## 3. Product information model
 
@@ -134,7 +154,7 @@ When the English name changes, the application may offer an explicit Translate a
 - Warning (multiline).
 - Import By — selected from reusable saved company/person records.
 - Distributed By — selected from reusable saved company/person records.
-- Maintain Import By and Distributed By master records in a dedicated **Import By & Distributed By** tab for plans whose entitlement allows reusable profile saving. Free users cannot save reusable Import By / Distributed By master profiles. Products may retain product-specific importer/distributor text according to the Free plan feature policy.
+- Maintain Import By and Distributed By master records in a dedicated **Import By & Distributed By** tab according to RSS Core entitlement flags. Trial users receive Premium access; paid-plan permissions are administrator-configurable.
 - Distributed By (company / person).
 - Pieces per Box (positive whole-number quantity).
 - Box Price (LKR / Rs.).
@@ -252,6 +272,7 @@ Use the Windows printing subsystem so the application can print to any compatibl
 
 Required features:
 - Printer selection and printer properties.
+- Premium print quality: selectable high-quality output including 300 DPI and 600 DPI where supported by the selected printer/driver. Query actual printer capabilities and never advertise unsupported resolution. Trial users receive Premium print-quality controls with the mandatory RSS TRIAL page watermark; paid Premium output has no system trial watermark.
 - Paper size and orientation selection.
 - Print preview.
 - Test print and calibration.
@@ -260,8 +281,9 @@ Required features:
 - Start at a specified label position on a partially used sheet.
 - Correct page breaks and multi-sheet output.
 - Actual-size / 100% output by default; never silently scale to fit.
+- The system RSS TRIAL watermark is separate from the user's optional logo watermark. Apply it to every printed/PDF page during the 14-day trial, including multi-page jobs.
 - Explicitly warn if printer driver settings may scale or clip output.
-- PDF export with correct page and label dimensions for plans whose RSS Core entitlement includes PDF export. Free users must not have PDF export.
+- PDF export with correct page and label dimensions when enabled by the RSS Core entitlement. Trial PDF pages must carry the mandatory RSS TRIAL watermark; expired trials require a paid entitlement.
 - Preserve Sinhala/Tamil glyph shaping and font appearance in PDF output; embed fonts where licensing permits or use a verified equivalent rendering approach.
 
 ## 10. Product management and bulk operations
@@ -273,7 +295,7 @@ Product management:
 - Reuse product records with different templates.
 
 Bulk import:
-- Excel and CSV import, subject to plan entitlements. Free-tier import restrictions must be explicitly defined in the plan matrix before release.
+- Excel and CSV import, subject to RSS Core plan entitlements. The trial receives Premium import/export features; paid-plan feature flags are configured by RSS Core Admin.
 - Column-to-field mapping.
 - Preview and validation before import.
 - Per-product copy quantities.
@@ -344,15 +366,15 @@ Requirements:
 
 ## 15. Non-functional requirements
 
-- After initial RSS Core authorization, product creation, editing, design and preview may work offline within the signed entitlement and cached quota rules.
-- Printing while offline is permitted only within the cached signed quota and offline grace period.
-- Registration, verification, license activation, quota reconciliation, shared-user changes and Google Drive backup/restore require internet.
+- After initial RSS Core authorization, product creation, editing, design and preview may work offline within the signed entitlement and configured offline grace.
+- Printing while offline is permitted only while the cached signed entitlement and offline grace remain valid. Trial watermark rules continue to apply.
+- Registration, verification, license activation, entitlement refresh, network-user changes and Google Drive backup/restore require internet.
 - Avoid data loss; autosave drafts or provide clear save state.
 - No silent text clipping, label overlap or page scaling.
 - Stable operation with large product lists and bulk jobs.
 - Logging for diagnostics without recording translation credentials or sensitive secrets.
 - Installer and application must support the declared Windows 10/11 target; validate actual OS/runtime requirements during build.
-- Free use requires a verified RSS Core account and is subject to the Free entitlement's daily print quota and feature flags. Paid access is a one-time annual RSS Premium license entitlement; do not assume recurring monthly billing.
+- RLM access requires a verified RSS Core account and a valid 14-day Premium trial or paid entitlement. There is no permanent Free plan. Paid licensing supports annual (12-month) and lifetime (one-time) terms in LKR and USD.
 
 ## Logo watermark
 
@@ -396,7 +418,7 @@ M4 — Custom dimensions, A4 layout engine and preview.
 M5 — Designer editing tools and barcode/QR.  
 M6 — Windows printing, calibration and PDF.  
 M7 — Excel/CSV bulk import.  
-M8 — RSS Core identity, license-key activation, quota enforcement, device licensing and shared-user access.
+M8 — RSS Core identity, 14-day trial, license-key activation, annual/lifetime pricing, device licensing and network shared-user access.
 M9 — Google Drive encrypted backup and restore.
 M10 — QA, installer, documentation and release.
 M9 — QA, installer, documentation and release.

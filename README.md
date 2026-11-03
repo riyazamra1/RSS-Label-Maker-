@@ -24,10 +24,22 @@ Native Windows desktop label-design and printing application by Razeen Secure So
 - Mandatory first-time registration and email verification are part of the approved product requirements.
 - Authentication, registration, verification, licensing, device activation, shared-user seats and entitlement checks are managed centrally by RSS Core (`https://rsscore.cv`). The desktop application must not create a separate account database or authentication Worker.
 - Product records, label designs, templates, watermark assets and print jobs remain on the PC in SQLite by default. Backup archives are encrypted locally and uploaded to the user's Google Drive only after explicit authorization.
-- Offline label work and printing are limited by the cached signed RSS Core entitlement, offline grace period and cached daily quota. The device credential must be protected with Windows Credential Manager / DPAPI.
-- Free accounts have a daily print quota, no PDF export and cannot save reusable Import By / Distributed By master profiles. Paid access is activated by a license key validated by RSS Core. New or unverified installations must not bypass the verification gate.
+- Offline label work and printing are limited by the cached signed RSS Core entitlement and configured offline grace period. The device credential must be protected with Windows Credential Manager / DPAPI.
+- Verified accounts receive a 14-day Premium trial with an RSS TRIAL watermark on every printed/PDF page. There is no permanent Free plan. After trial expiry, printing and Premium features require a paid license key validated by RSS Core; local data remains intact.
 - RSS Core API capabilities must be checked against its implemented and deployed contract before the desktop client enables each feature. Do not assume a route is live merely because it appears in a requirements document.
 - Detailed RSS Core API integration, known existing endpoints and missing server-side capabilities are documented in [docs/RSS-CORE-INTEGRATION.md](docs/RSS-CORE-INTEGRATION.md). Licensing, device activation, quota enforcement and Google Drive backup are specified in `REQUIREMENTS.md`.
+
+## Proposed RLM license pricing
+
+All prices are proposals, configurable by RSS Core Admin, and are not activated or hard-coded. The plans support annual (12-month) and lifetime (one-time) licenses in LKR and USD:
+
+| Plan | Annual LKR / USD | Lifetime LKR / USD |
+|---|---:|---:|
+| Premium — Single PC (1 PC) | 5,000 / $25 | 12,000 / $60 |
+| Premium — Shared License (1 owner, 3 PCs) | 9,000 / $50 | 22,000 / $120 |
+| Premium — Multiple PC (Network, 5 PCs) | 18,000 / $100 | 40,000 / $220 |
+
+The 14-day Premium trial includes full Premium features with an RSS TRIAL watermark on every printed/PDF page. No permanent Free plan exists. Shared License means one owner using multiple registered PCs; Multiple PC (Network) means PCs in a shared local-network workspace with separately controlled user seats. Premium printing includes 300/600 DPI options where supported by the printer.
 
 ## Company contact details
 
@@ -44,7 +56,7 @@ This is an active development branch, not a release-ready application. The follo
 - Full designer editing (drag, resize, alignment, layers, undo/redo, barcode and QR).
 - Accurate physical sheet layout including margins, gaps, printer printable-area validation and partially-used-sheet starting position.
 - Physical print acceptance testing, printer-specific printable-area validation, and calibration against real Windows printer drivers. The custom page preview/print code has not yet been compiled or verified on a Windows printer.
-- PDF export is a paid-entitlement feature; Free accounts must not be allowed to export PDFs. The PDF renderer and entitlement gate are not implemented yet.
+- PDF export is a trial/Premium-entitlement feature. Trial PDF pages must carry the RSS TRIAL watermark; expired trials require a paid license. The PDF renderer and entitlement gate are not implemented yet.
 - Excel/CSV import with mapping and row validation.
 - Online Sinhala/Tamil translation provider and local translation cache.
 - Database backup/restore, automated tests, installer and Windows 10/11 acceptance testing.
@@ -64,7 +76,7 @@ dotnet build .\RSS.LabelMaker.sln -c Release
 dotnet run --project .\src\RSS.LabelMaker.App\RSS.LabelMaker.App.csproj
 ```
 
-This is a native WPF application, not a WebView wrapper. It does not depend on RSS Core or a subscription. Mandatory first-time email verification uses a separate authentication service; already-authorized PCs must retain offline label functionality.
+This is a native WPF application, not a WebView wrapper. RSS Core is required for registration, verification, trial entitlement and paid licensing. Already-authorized PCs may retain bounded offline functionality using cached signed entitlements.
 
 See [REQUIREMENTS.md](REQUIREMENTS.md) for the approved product specification.
 
