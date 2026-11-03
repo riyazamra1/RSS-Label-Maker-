@@ -13,6 +13,9 @@ namespace RSS.LabelMaker.App;
 public partial class MainWindow : Window
 {
     private readonly ObservableCollection<ProductRow> _products = new();
+    private readonly ObservableCollection<CompanyProfileRow> _companyProfiles = new();
+    private CompanyProfileStore? _companyProfileStore;
+    private string? _editingCompanyProfileId;
     private WatermarkStore? _watermarkStore;
     private ProductStore? _productStore;
     private string? _editingProductId;
@@ -54,6 +57,18 @@ public partial class MainWindow : Window
                 $"Local watermark storage could not be opened. The designer can still be used, but watermark changes will not persist. {ex.Message}",
                 "Local storage warning", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+        try
+        {
+            _companyProfileStore = new CompanyProfileStore();
+            foreach (var profile in _companyProfileStore.Load()) _companyProfiles.Add(profile);
+            CompanyProfilesGrid.ItemsSource = _companyProfiles;
+            CompanyProfileCount.Text = _companyProfiles.Count.ToString();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"Company profile storage could not be opened. {ex.Message}",
+                "Company profile storage warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
         RefreshPrinters();
         ShowPage("Dashboard");
     }
@@ -73,6 +88,7 @@ public partial class MainWindow : Window
         PrintPage.Visibility = page == "Print" ? Visibility.Visible : Visibility.Collapsed;
         ImportPage.Visibility = page == "Import" ? Visibility.Visible : Visibility.Collapsed;
         SettingsPage.Visibility = page == "Settings" ? Visibility.Visible : Visibility.Collapsed;
+        CompanyProfilesPage.Visibility = page == "CompanyProfiles" ? Visibility.Visible : Visibility.Collapsed;
 
         PageTitle.Text = page switch
         {
@@ -81,6 +97,7 @@ public partial class MainWindow : Window
             "Templates" => "Templates",
             "Print" => "Print Manager",
             "Import" => "Import / Export",
+            "CompanyProfiles" => "Import By & Distributed By",
             "Settings" => "Settings",
             _ => "Dashboard"
         };
@@ -91,10 +108,11 @@ public partial class MainWindow : Window
             "Templates" => "Choose a starting layout for your labels",
             "Print" => "Select a Windows printer and prepare accurate output",
             "Import" => "Bring product data in and export finished labels",
+            "CompanyProfiles" => "Save reusable company and person details for product labels",
             "Settings" => "Configure this local application",
             _ => "Your label production workspace"
         };
-        var buttons = new[] { NavDashboard, NavProducts, NavDesigner, NavTemplates, NavPrint, NavImport, NavSettings };
+        var buttons = new[] { NavDashboard, NavProducts, NavDesigner, NavTemplates, NavPrint, NavImport, NavCompanyProfiles, NavSettings };
         foreach (var item in buttons)
         {
             var selected = Equals(item.Tag?.ToString(), page);
@@ -262,6 +280,73 @@ public partial class MainWindow : Window
         {
             ProductStatus.Text = $"Product could not be deleted: {ex.Message}";
         }
+    }
+
+
+    private void SaveCompanyProfile_Click(object sender, RoutedEventArgs e)
+    {
+        if (_companyProfileStore is null) { CompanyProfileStatus.Text = "Company profile storage is unavailable."; return; }
+        var name = CompanyProfileName.Text.Trim();
+        var address = CompanyProfileAddress.Text.Trim();
+        if (name.Length == 0 || address.Length == 0)
+        { CompanyProfileStatus.Text = "Enter both a company/person name and the full address."; return; }
+        var profile = new CompanyProfileRow
+        {
+            Id = _editingCompanyProfileId ?? Guid.NewGuid().ToString("N"),
+            ProfileType = CompanyProfileType.SelectedIndex == 1 ? "Distributed By" : "Import By",
+            Name = name, Address = address, Contact = CompanyProfileContact.Text.Trim()
+        };
+        try
+        {
+            if (_editingCompanyProfileId is null)
+            { _companyProfileStore.Save(profile); _companyProfiles.Add(profile); CompanyProfileStatus.Text = "Company/person profile saved."; }
+            else
+            {
+                _companyProfileStore.Update(profile);
+                var index = _companyProfiles.ToList().FindIndex(item => item.Id == profile.Id);
+                if (index >= 0) _companyProfiles[index] = profile;
+                _editingCompanyProfileId = null; SaveCompanyProfileButton.Content = "Save Profile";
+                CompanyProfileStatus.Text = "Company/person profile updated.";
+            }
+            CompanyProfileCount.Text = _companyProfiles.Count.ToString();
+            CompanyProfilesGrid.Items.Refresh();
+        }
+        catch (Exception ex) { CompanyProfileStatus.Text = $"Profile could not be saved: {ex.Message}"; }
+    }
+
+    private void EditCompanyProfile_Click(object sender, RoutedEventArgs e)
+    {
+        if (CompanyProfilesGrid.SelectedItem is not CompanyProfileRow profile)
+        { CompanyProfileStatus.Text = "Select a profile first."; return; }
+        _editingCompanyProfileId = profile.Id;
+        CompanyProfileType.SelectedIndex = profile.ProfileType == "Distributed By" ? 1 : 0;
+        CompanyProfileName.Text = profile.Name; CompanyProfileAddress.Text = profile.Address;
+        CompanyProfileContact.Text = profile.Contact; SaveCompanyProfileButton.Content = "Update Profile";
+        CompanyProfileStatus.Text = $"Editing {profile.Name}. Update the details and save.";
+    }
+
+    private void DeleteCompanyProfile_Click(object sender, RoutedEventArgs e)
+    {
+        if (CompanyProfilesGrid.SelectedItem is not CompanyProfileRow profile)
+        { CompanyProfileStatus.Text = "Select a profile first."; return; }
+        if (MessageBox.Show(this, $"Delete '{profile.Name}' from saved company/person profiles?",
+            "Confirm profile deletion", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+        if (_companyProfileStore is null) return;
+        try
+        {
+            _companyProfileStore.Delete(profile.Id); _companyProfiles.Remove(profile);
+            if (_editingCompanyProfileId == profile.Id) { _editingCompanyProfileId = null; SaveCompanyProfileButton.Content = "Save Profile"; }
+            CompanyProfileCount.Text = _companyProfiles.Count.ToString();
+            CompanyProfileStatus.Text = $"Deleted '{profile.Name}'.";
+        }
+        catch (Exception ex) { CompanyProfileStatus.Text = $"Profile could not be deleted: {ex.Message}"; }
+    }
+
+    private void ClearCompanyProfile_Click(object sender, RoutedEventArgs e)
+    {
+        _editingCompanyProfileId = null; CompanyProfileType.SelectedIndex = 0;
+        CompanyProfileName.Clear(); CompanyProfileAddress.Clear(); CompanyProfileContact.Clear();
+        SaveCompanyProfileButton.Content = "Save Profile"; CompanyProfileStatus.Text = "Ready for a new profile.";
     }
 
     private void ApplyLayout_Click(object sender, RoutedEventArgs e)
@@ -572,6 +657,71 @@ public partial class MainWindow : Window
         {
             PrintStatus.Text = $"Calibration page could not be printed: {ex.Message}";
         }
+    }
+
+
+    private sealed class CompanyProfileRow
+    {
+        public string Id { get; init; } = Guid.NewGuid().ToString("N");
+        public string ProfileType { get; init; } = "Import By";
+        public string Name { get; init; } = "";
+        public string Address { get; init; } = "";
+        public string Contact { get; init; } = "";
+    }
+
+    private sealed class CompanyProfileStore
+    {
+        private readonly string _connectionString;
+        public CompanyProfileStore()
+        {
+            var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "Razeen Secure Solution", "RSS Label Maker");
+            Directory.CreateDirectory(folder);
+            _connectionString = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder
+            {
+                DataSource = Path.Combine(folder, "rss-label-maker.db"),
+                Mode = Microsoft.Data.Sqlite.SqliteOpenMode.ReadWriteCreate
+            }.ToString();
+            using var connection = OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = "CREATE TABLE IF NOT EXISTS CompanyProfiles (Id TEXT NOT NULL PRIMARY KEY, ProfileType TEXT NOT NULL, Name TEXT NOT NULL, Address TEXT NOT NULL, Contact TEXT NOT NULL DEFAULT '', CreatedUtc TEXT NOT NULL);";
+            command.ExecuteNonQuery();
+        }
+        public List<CompanyProfileRow> Load()
+        {
+            var rows = new List<CompanyProfileRow>();
+            using var connection = OpenConnection(); using var command = connection.CreateCommand();
+            command.CommandText = "SELECT Id, ProfileType, Name, Address, Contact FROM CompanyProfiles ORDER BY Name COLLATE NOCASE;";
+            using var reader = command.ExecuteReader();
+            while (reader.Read()) rows.Add(new CompanyProfileRow { Id=reader.GetString(0), ProfileType=reader.GetString(1), Name=reader.GetString(2), Address=reader.GetString(3), Contact=reader.GetString(4) });
+            return rows;
+        }
+        public void Save(CompanyProfileRow p)
+        {
+            using var connection=OpenConnection(); using var command=connection.CreateCommand();
+            command.CommandText="INSERT INTO CompanyProfiles (Id,ProfileType,Name,Address,Contact,CreatedUtc) VALUES ($id,$type,$name,$address,$contact,$created);";
+            AddParameters(command,p); command.Parameters.AddWithValue("$created",DateTime.UtcNow.ToString("O")); command.ExecuteNonQuery();
+        }
+        public void Update(CompanyProfileRow p)
+        {
+            using var connection=OpenConnection(); using var command=connection.CreateCommand();
+            command.CommandText="UPDATE CompanyProfiles SET ProfileType=$type,Name=$name,Address=$address,Contact=$contact WHERE Id=$id;";
+            AddParameters(command,p); if(command.ExecuteNonQuery()!=1) throw new InvalidOperationException("The company/person profile no longer exists.");
+        }
+        public void Delete(string id)
+        {
+            using var connection=OpenConnection(); using var command=connection.CreateCommand();
+            command.CommandText="DELETE FROM CompanyProfiles WHERE Id=$id;"; command.Parameters.AddWithValue("$id",id);
+            if(command.ExecuteNonQuery()!=1) throw new InvalidOperationException("The company/person profile no longer exists.");
+        }
+        private static void AddParameters(Microsoft.Data.Sqlite.SqliteCommand c, CompanyProfileRow p)
+        {
+            c.Parameters.AddWithValue("$id",p.Id); c.Parameters.AddWithValue("$type",p.ProfileType);
+            c.Parameters.AddWithValue("$name",p.Name); c.Parameters.AddWithValue("$address",p.Address);
+            c.Parameters.AddWithValue("$contact",p.Contact);
+        }
+        private Microsoft.Data.Sqlite.SqliteConnection OpenConnection()
+        { var c=new Microsoft.Data.Sqlite.SqliteConnection(_connectionString); c.Open(); return c; }
     }
 
     private sealed class ProductRow
