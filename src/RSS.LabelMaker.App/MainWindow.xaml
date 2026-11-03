@@ -25,6 +25,7 @@
      <Button x:Name="NavTemplates" Content="▣   Templates" Click="Nav_Click" Tag="Templates" HorizontalContentAlignment="Left" Margin="10,2" Background="Transparent" Foreground="#D4D8DE"/>
      <Button x:Name="NavPrint" Content="▤   Print Manager" Click="Nav_Click" Tag="Print" HorizontalContentAlignment="Left" Margin="10,2" Background="Transparent" Foreground="#D4D8DE"/>
      <Button x:Name="NavImport" Content="⇧   Import / Export" Click="Nav_Click" Tag="Import" HorizontalContentAlignment="Left" Margin="10,2" Background="Transparent" Foreground="#D4D8DE"/>
+     <Button x:Name="NavCompanyProfiles" Content="▣   Import By / Distributed By" Click="Nav_Click" Tag="CompanyProfiles" HorizontalContentAlignment="Left" Margin="10,2" Background="Transparent" Foreground="#D4D8DE"/>
      <TextBlock Text="PREFERENCES" Foreground="#777F89" FontSize="10" FontWeight="Bold" Margin="22,28,0,12"/>
      <Button x:Name="NavSettings" Content="⚙   Settings" Click="Nav_Click" Tag="Settings" HorizontalContentAlignment="Left" Margin="10,2" Background="Transparent" Foreground="#D4D8DE"/>
     </StackPanel>
@@ -246,6 +247,35 @@
        <TextBlock Text="Rows and columns will be calculated from label size, gaps and margins. The selected printer's printable area must also be checked." TextWrapping="Wrap" Foreground="#77808C" FontSize="12" Margin="0,8,0,0"/>
        <TextBlock Text="Print scale: 100%" Foreground="#4E7B5C" FontWeight="Bold" Margin="0,18,0,0"/>
       </StackPanel>
+     </Border>
+    </Grid>
+
+    <Grid x:Name="CompanyProfilesPage" Visibility="Collapsed">
+     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+     <Border Background="White" CornerRadius="8" Padding="20" Margin="0,0,0,16">
+      <StackPanel>
+       <TextBlock Text="COMPANY / PERSON PROFILE" FontSize="11" FontWeight="Bold" Foreground="#77808C" Margin="0,0,0,12"/>
+       <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="160"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+        <StackPanel Grid.Column="0" Margin="0,0,12,0"><TextBlock Text="Profile type" FontSize="11" Margin="0,0,0,5"/><ComboBox x:Name="CompanyProfileType" SelectedIndex="0"><ComboBoxItem Content="Import By"/><ComboBoxItem Content="Distributed By"/></ComboBox></StackPanel>
+        <StackPanel Grid.Column="1" Margin="0,0,12,0"><TextBlock Text="Company / person name" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="CompanyProfileName"/></StackPanel>
+        <StackPanel Grid.Column="2"><TextBlock Text="Phone / contact (optional)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="CompanyProfileContact"/></StackPanel>
+       </Grid>
+       <TextBlock Text="Full address" FontSize="11" Margin="0,12,0,5"/>
+       <TextBox x:Name="CompanyProfileAddress" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="58" VerticalScrollBarVisibility="Auto"/>
+       <StackPanel Orientation="Horizontal" Margin="0,12,0,0"><Button x:Name="SaveCompanyProfileButton" Content="Save Profile" Click="SaveCompanyProfile_Click" Background="#C69A43" Foreground="#20242B" Padding="18,8" Margin="0,0,8,0"/><Button Content="Clear" Click="ClearCompanyProfile_Click" Padding="16,8"/></StackPanel>
+       <TextBlock x:Name="CompanyProfileStatus" Foreground="#4E7B5C" FontSize="11" Margin="0,9,0,0"/>
+      </StackPanel>
+     </Border>
+     <Border Grid.Row="1" Background="White" CornerRadius="8" Padding="18">
+      <DockPanel>
+       <DockPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><Button Content="Edit selected" Click="EditCompanyProfile_Click" Padding="12,6" Margin="0,0,8,0"/><Button Content="Delete selected" Click="DeleteCompanyProfile_Click" Padding="12,6"/></StackPanel>
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="SAVED PROFILES" FontSize="11" FontWeight="Bold" Foreground="#77808C"/><TextBlock x:Name="CompanyProfileCount" Text="0" FontSize="11" Foreground="#C69A43" FontWeight="Bold" Margin="10,0,0,0"/></StackPanel>
+       </DockPanel>
+       <DataGrid x:Name="CompanyProfilesGrid" AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True" HeadersVisibility="Column" GridLinesVisibility="Horizontal" BorderThickness="0">
+        <DataGrid.Columns><DataGridTextColumn Header="Type" Binding="{Binding ProfileType}" Width="140"/><DataGridTextColumn Header="Company / Person" Binding="{Binding Name}" Width="2*"/><DataGridTextColumn Header="Full address" Binding="{Binding Address}" Width="3*"/><DataGridTextColumn Header="Contact" Binding="{Binding Contact}" Width="*"/></DataGrid.Columns>
+       </DataGrid>
+      </DockPanel>
      </Border>
     </Grid>
     <!-- Import and settings placeholder pages -->
