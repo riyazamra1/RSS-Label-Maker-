@@ -6,7 +6,8 @@ using System.Text.Json;
 
 namespace RSS.LabelMaker.App;
 
-internal sealed record StagedUpdate(string Version, string PackagePath);
+internal sealed record StagedUpdate(string Version, string PreviousVersion, string PackagePath, string ReleaseNotes);
+internal sealed record UpdateWelcomeInfo(string PreviousVersion, string NewVersion, string ReleaseNotes, DateTimeOffset InstalledUtc);
 
 internal static class UpdateService
 {
@@ -26,6 +27,7 @@ internal static class UpdateService
 
         using var release = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
         var root = release.RootElement;
+        var releaseNotes = root.TryGetProperty("body", out var bodyElement) ? bodyElement.GetString() ?? "" : "";
         var tag = root.GetProperty("tag_name").GetString()?.TrimStart('v', 'V');
         if (!Version.TryParse(tag, out var latest)) return null;
 
@@ -62,7 +64,7 @@ internal static class UpdateService
                 Convert.FromHexString(expectedHash), Convert.FromHexString(actualHash)))
             throw new InvalidDataException("The downloaded update failed SHA-256 integrity verification.");
 
-        return new StagedUpdate(latest.ToString(), packagePath);
+        return new StagedUpdate(latest.ToString(), current.ToString(), packagePath, releaseNotes);
     }
 
     private static async Task DownloadAsync(HttpClient client, string url, string path, CancellationToken token)
@@ -75,9 +77,31 @@ internal static class UpdateService
         await output.FlushAsync(token);
     }
 
-    public static void StartUpdater(string packagePath, string executablePath, int parentProcessId)
+    public static string GetUpdateMarkerPath() => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "Razeen Secure Solution", "RSS Label Maker", "update-completed.json");
+
+    public static UpdateWelcomeInfo? ReadPendingUpdate()
     {
+        var path = GetUpdateMarkerPath();
+        if (!File.Exists(path)) return null;
+        try { return JsonSerializer.Deserialize<UpdateWelcomeInfo>(File.ReadAllText(path)); }
+        catch { return null; }
+    }
+
+    public static void AcknowledgeUpdate() 
+    {
+        var path = GetUpdateMarkerPath();
+        if (File.Exists(path)) File.Delete(path);
+    }
+
+    public static void StartUpdater(StagedUpdate update, string executablePath, int parentProcessId)
+    {
+        var packagePath = update.PackagePath;
         var updaterPath = Path.Combine(Path.GetDirectoryName(packagePath)!, "rlm-updater.ps1");
+        var updateInfoPath = Path.Combine(Path.GetDirectoryName(packagePath)!, "update-info.json");
+        File.WriteAllText(updateInfoPath, JsonSerializer.Serialize(new UpdateWelcomeInfo(
+            update.PreviousVersion, update.Version, update.ReleaseNotes, DateTimeOffset.UtcNow)));
         File.WriteAllText(updaterPath, UpdaterScript);
         var start = new ProcessStartInfo
         {
@@ -96,6 +120,10 @@ internal static class UpdateService
         start.ArgumentList.Add(executablePath);
         start.ArgumentList.Add("-ParentPid");
         start.ArgumentList.Add(parentProcessId.ToString());
+        start.ArgumentList.Add("-UpdateInfoPath");
+        start.ArgumentList.Add(updateInfoPath);
+        start.ArgumentList.Add("-MarkerPath");
+        start.ArgumentList.Add(GetUpdateMarkerPath());
         _ = Process.Start(start) ?? throw new InvalidOperationException("Could not start the separate update process.");
     }
 
@@ -103,7 +131,9 @@ internal static class UpdateService
 param(
     [Parameter(Mandatory=$true)][string]$PackagePath,
     [Parameter(Mandatory=$true)][string]$ExecutablePath,
-    [Parameter(Mandatory=$true)][int]$ParentPid
+    [Parameter(Mandatory=$true)][int]$ParentPid,
+    [Parameter(Mandatory=$true)][string]$UpdateInfoPath,
+    [Parameter(Mandatory=$true)][string]$MarkerPath
 )
 $ErrorActionPreference = 'Stop'
 $installDir = Split-Path -Parent $ExecutablePath
@@ -121,6 +151,9 @@ try {
     if (!(Test-Path $stagedExe)) { throw 'Update archive does not contain the expected executable.' }
     if (Test-Path $ExecutablePath) { Copy-Item $ExecutablePath $backupPath -Force }
     Copy-Item $stagedExe $ExecutablePath -Force
+    $markerDir = Split-Path -Parent $MarkerPath
+    New-Item -ItemType Directory -Force -Path $markerDir | Out-Null
+    Copy-Item $UpdateInfoPath $MarkerPath -Force
     $newProcess = Start-Process -FilePath $ExecutablePath -PassThru
     Start-Sleep -Seconds 8
     $newProcess.Refresh()
@@ -128,6 +161,7 @@ try {
     if (Test-Path $backupPath) { Remove-Item $backupPath -Force }
     Remove-Item $workDir -Recurse -Force -ErrorAction SilentlyContinue
 } catch {
+    if (Test-Path $MarkerPath) { Remove-Item $MarkerPath -Force -ErrorAction SilentlyContinue }
     if (Test-Path $backupPath) { Copy-Item $backupPath $ExecutablePath -Force }
     Start-Process -FilePath $ExecutablePath -ErrorAction SilentlyContinue
     exit 1
