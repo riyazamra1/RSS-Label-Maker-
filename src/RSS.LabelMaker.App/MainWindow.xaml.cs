@@ -36,6 +36,7 @@ public partial class MainWindow : Window
     private TextBox? _maximumFontSize;
     private CheckBox? _automaticUpdates;
     private TextBlock? _updateStatus;
+    private Button? _accountButton;
 
     public MainWindow()
     {
@@ -52,6 +53,7 @@ public partial class MainWindow : Window
         InitializeSessionRecovery();
         Loaded += async (_, _) =>
         {
+            await RefreshAccountButtonAsync();
             await ShowPendingUpdateWelcomeAsync();
             await CheckForUpdatesAsync(false);
         };
@@ -78,7 +80,27 @@ public partial class MainWindow : Window
                 var existingRightPanel = headerGrid.Children.OfType<StackPanel>()
                     .FirstOrDefault(panel => panel.HorizontalAlignment == HorizontalAlignment.Right);
                 if (existingRightPanel is not null)
-                    existingRightPanel.Margin = new Thickness(0, 0, 190, 0);
+                {
+                    existingRightPanel.Margin = new Thickness(0, 0, 150, 0);
+                    _accountButton = new Button
+                    {
+                        Content = "Sign in",
+                        Padding = new Thickness(12, 6, 12, 6),
+                        Margin = new Thickness(0, 0, 10, 0),
+                        Background = Brush("#C69A43"),
+                        Foreground = Brush("#20242B"),
+                        FontWeight = FontWeights.SemiBold,
+                        BorderThickness = new Thickness(0),
+                        Cursor = System.Windows.Input.Cursors.Hand
+                    };
+                    _accountButton.Click += async (_, _) =>
+                    {
+                        var account = new AccountWindow { Owner = this };
+                        account.ShowDialog();
+                        await RefreshAccountButtonAsync();
+                    };
+                    existingRightPanel.Children.Insert(0, _accountButton);
+                }
 
                 var clockPanel = new StackPanel
                 {
@@ -115,6 +137,25 @@ public partial class MainWindow : Window
 
         BuildSettingsPage();
         BuildDesignerOptions();
+    }
+
+
+    private async Task RefreshAccountButtonAsync()
+    {
+        if (_accountButton is null) return;
+        try
+        {
+            var session = await RssCoreAccountClient.GetSessionAsync();
+            _accountButton.Content = session is null ? "Sign in" : "My account";
+            _accountButton.ToolTip = session is null
+                ? "Sign in to RSS Core for cloud backup, restore and license management."
+                : $"Signed in as {session.Email}";
+        }
+        catch
+        {
+            _accountButton.Content = "Sign in";
+            _accountButton.ToolTip = "RSS Core account services require an internet connection.";
+        }
     }
 
     private void BuildSettingsPage()
