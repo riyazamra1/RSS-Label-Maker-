@@ -5,6 +5,8 @@ Native Windows desktop label-design and printing application by Razeen Secure So
 ## Implemented in the current feature branch
 
 - Native C# / .NET 10 WPF desktop shell with RSS-branded navigation and dashboard.
+- About page describing Razeen Secure Solution, its services and RSS Label Maker.
+- Contact page with validated name, email, phone, subject and message fields. Submit opens the user's default email application with a pre-addressed draft to riyaz@rssapps.net; the user confirms delivery by pressing Send.
 - Product creation, local SQLite persistence, edit, delete and reload.
 - English, Sinhala and Tamil product-name fields.
 - M.F.D, EXP.D, Batch Number and Net Weight fields with four independent **Print on Pack** controls. Each enabled field displays the exact text "Printed on Pack" in the live preview; other fields remain independent.
@@ -15,6 +17,12 @@ Native Windows desktop label-design and printing application by Razeen Secure So
 - Custom label width/height entry and nominal A4/A5/Letter row/column estimate.
 - Windows-installed printer discovery and a 100 mm calibration-page print action.
 - Logo watermark image selection, local binary persistence in SQLite, remove action and continuously adjustable 0–100% opacity setting. The current watermark preview is not yet integrated into final label print/PDF rendering.
+
+## Company contact details
+
+- Website: https://www.rssapps.net
+- Phone: +94 77 115 5504 | +94 70 155 5504
+- Email: riyaz@rssapps.net
 
 ## Current implementation limitations
 
