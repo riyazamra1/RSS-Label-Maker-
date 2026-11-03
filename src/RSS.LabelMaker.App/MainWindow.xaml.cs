@@ -335,6 +335,8 @@ public partial class MainWindow : Window
 
     private sealed class ProductRow
     {
+        public ProductRow() { }
+
         public string Id { get; init; } = Guid.NewGuid().ToString("N");
         public string English { get; init; } = "";
         public string Sinhala { get; init; } = "";
