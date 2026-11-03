@@ -58,7 +58,7 @@ internal static class DeviceCredentialStore
         {
             var credential = Marshal.PtrToStructure<NativeCredential>(pointer);
             if (credential.CredentialBlob == IntPtr.Zero || credential.CredentialBlobSize == 0) return null;
-            var bytes = new byte[credential.CredentialBlobSize];
+            var bytes = new byte[checked((int)credential.CredentialBlobSize)];
             Marshal.Copy(credential.CredentialBlob, bytes, 0, bytes.Length);
             return Encoding.UTF8.GetString(bytes);
         }
