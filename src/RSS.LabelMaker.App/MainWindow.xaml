@@ -20,7 +20,7 @@
     <StackPanel>
      <TextBlock Text="WORKSPACE" Foreground="#777F89" FontSize="10" FontWeight="Bold" Margin="22,0,0,12"/>
      <Button x:Name="NavDashboard" Content="▦   Dashboard" Click="Nav_Click" Tag="Dashboard" HorizontalContentAlignment="Left" Margin="10,2" Background="#373D46" Foreground="White"/>
-     <Button x:Name="NavProducts" Content="▤   Products" Click="Nav_Click" Tag="Products" HorizontalContentAlignment="Left" Margin="10,2" Background="Transparent" Foreground="#D4D8DE"/>
+     <Button x:Name="NavProducts" Content="▤   Items Manager" Click="Nav_Click" Tag="Products" HorizontalContentAlignment="Left" Margin="10,2" Background="Transparent" Foreground="#D4D8DE"/>
      <Button x:Name="NavDesigner" Content="▧   Label Designer" Click="Nav_Click" Tag="Designer" HorizontalContentAlignment="Left" Margin="10,2" Background="Transparent" Foreground="#D4D8DE"/>
      <Button x:Name="NavTemplates" Content="▣   Templates" Click="Nav_Click" Tag="Templates" HorizontalContentAlignment="Left" Margin="10,2" Background="Transparent" Foreground="#D4D8DE"/>
      <Button x:Name="NavPrint" Content="▤   Print Manager" Click="Nav_Click" Tag="Print" HorizontalContentAlignment="Left" Margin="10,2" Background="Transparent" Foreground="#D4D8DE"/>
