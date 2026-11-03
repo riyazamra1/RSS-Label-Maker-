@@ -850,14 +850,15 @@ public partial class MainWindow : Window
         double fontSize, bool bold, Brush brush, TextAlignment alignment)
     {
         if (string.IsNullOrWhiteSpace(text) || maxWidth <= 0) return;
+        var typeface = new Typeface(new FontFamily("Arial"), FontStyles.Normal,
+            bold ? FontWeights.Bold : FontWeights.Normal, FontStretches.Normal);
         var formatted = new FormattedText(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
-            new Typeface("Arial"), fontSize, brush, 1d)
+            typeface, fontSize, brush, 1d)
         {
             MaxTextWidth = maxWidth,
             MaxTextHeight = Math.Max(fontSize * 2.4d, fontSize + 1d),
             TextAlignment = alignment,
-            Trimming = TextTrimming.CharacterEllipsis,
-            FontWeight = bold ? FontWeights.Bold : FontWeights.Normal
+            Trimming = TextTrimming.CharacterEllipsis
         };
         dc.DrawText(formatted, new Point(x, y));
     }
