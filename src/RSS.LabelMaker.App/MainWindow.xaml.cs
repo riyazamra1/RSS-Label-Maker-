@@ -354,7 +354,8 @@ public partial class MainWindow : Window
             ShowPerPiecePrice = ShowPerPiecePrice.IsChecked == true,
             PerPiecePricingMode = PerPiecePricingMode.SelectedIndex == 1 ? "Manual" : "Automatic",
             ManualPerPiecePrice = ManualPerPiecePrice.Text.Trim(),
-            Copies = string.IsNullOrWhiteSpace(Copies.Text) ? "1" : Copies.Text.Trim()
+            Copies = string.IsNullOrWhiteSpace(Copies.Text) ? "1" : Copies.Text.Trim(),
+            IsPrintSelected = _products.FirstOrDefault(p => p.Id == productId)?.IsPrintSelected ?? false
         };
 
         try
@@ -394,6 +395,7 @@ public partial class MainWindow : Window
             ProductsGrid.Items.Refresh();
             PrintProductsList.Items.Refresh();
             UpdatePreview();
+            UpdatePrintCapacityMonitor();
         }
         catch (Exception ex)
         {
@@ -431,6 +433,7 @@ public partial class MainWindow : Window
         {
             _productStore.Delete(product.Id);
             _products.Remove(product);
+            UpdatePrintCapacityMonitor();
             if (_editingProductId == product.Id)
             {
                 _editingProductId = null;
