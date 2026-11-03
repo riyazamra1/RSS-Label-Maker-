@@ -150,6 +150,7 @@ public partial class MainWindow : Window
             item.Background = selected ? System.Windows.Media.Brushes.DimGray : System.Windows.Media.Brushes.Transparent;
             item.Foreground = System.Windows.Media.Brushes.WhiteSmoke;
         }
+        if (page == "Print") UpdatePrintCapacityMonitor();
     }
 
     private void OpenDesigner_Click(object sender, RoutedEventArgs e) => ShowPage("Designer");
@@ -846,17 +847,27 @@ public partial class MainWindow : Window
     private void SelectAllPrintProducts_Click(object sender, RoutedEventArgs e)
     {
         foreach (var product in _products) product.IsPrintSelected = true;
+        if (EnableMultipleLabels?.IsChecked != true && _products.Count > 0)
+            foreach (var product in _products.Skip(1)) product.IsPrintSelected = false;
         PrintProductsList.Items.Refresh();
+        UpdatePrintCapacityMonitor();
     }
 
     private void ClearPrintProducts_Click(object sender, RoutedEventArgs e)
     {
         foreach (var product in _products) product.IsPrintSelected = false;
         PrintProductsList.Items.Refresh();
+        UpdatePrintCapacityMonitor();
     }
 
     private void OpenPrintPreview_Click(object sender, RoutedEventArgs e)
     {
+        if (EnableMultipleLabels?.IsChecked != true)
+        {
+            var firstSelected = _products.FirstOrDefault(p => p.IsPrintSelected);
+            foreach (var product in _products) product.IsPrintSelected = ReferenceEquals(product, firstSelected);
+            PrintProductsList.Items.Refresh();
+        }
         var selectedProducts = _products.Where(p => p.IsPrintSelected).ToList();
         if (selectedProducts.Count == 0)
         {
