@@ -16,6 +16,7 @@ Native Windows desktop label-design and printing application by Razeen Secure So
 - Reference-inspired food-label preview with the three nutrition panels.
 - Custom label width/height entry and nominal A4/A5/Letter row/column estimate.
 - Windows-installed printer discovery, a 100 mm calibration-page print action, and a first product-label print renderer for the selected saved product. The renderer uses the Designer's label dimensions, product copies, nutrition panels, Print on Pack text, Import By / Distributed By details, and the saved watermark opacity.
+- Multi-page print preview with A4, A5, Letter and custom paper dimensions, portrait/landscape orientation, page margins, label gaps, automatic rows/columns, page navigation and multi-page print submission. Preview and print share the same rendered sheet visuals.
 - Logo watermark image selection, local binary persistence in SQLite, remove action and continuously adjustable 0–100% opacity setting. The current watermark preview is not yet integrated into final label print/PDF rendering.
 
 ## Account registration and offline use
@@ -42,7 +43,7 @@ This is an active development branch, not a release-ready application. The follo
 - Persisted, editable user templates; watermark settings and image assets must be stored per template.
 - Full designer editing (drag, resize, alignment, layers, undo/redo, barcode and QR).
 - Accurate physical sheet layout including margins, gaps, printer printable-area validation and partially-used-sheet starting position.
-- Physical print acceptance testing, exact printer printable-area handling, and multi-label sheet layout. The first product-label renderer is implemented but has not yet been compiled or verified on a Windows printer.
+- Physical print acceptance testing, printer-specific printable-area validation, and calibration against real Windows printer drivers. The custom page preview/print code has not yet been compiled or verified on a Windows printer.
 - PDF export is a paid-entitlement feature; Free accounts must not be allowed to export PDFs. The PDF renderer and entitlement gate are not implemented yet.
 - Excel/CSV import with mapping and row validation.
 - Online Sinhala/Tamil translation provider and local translation cache.
