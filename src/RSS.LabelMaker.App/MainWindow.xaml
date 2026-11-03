@@ -290,7 +290,7 @@
          <TextBlock Text="RAZEEN SECURE SOLUTION" Foreground="#D5AD5B" FontSize="11" FontWeight="Bold"/>
          <TextBlock Text="Technology that secures, connects and simplifies." Foreground="White" FontSize="25" FontWeight="Bold" TextWrapping="Wrap" Margin="0,10,0,8"/>
          <TextBlock Text="Razeen Secure Solution (RSS) is a technology company established in 2015, delivering software, security and IT solutions for businesses and individuals." Foreground="#D5D9DF" FontSize="13" TextWrapping="Wrap" MaxWidth="780"/>
-         <Button Content="Visit www.rssapps.net  ↗" Click="OpenWebsite_Click" HorizontalAlignment="Left" Background="#C69A43" Foreground="#20242B" Padding="18,9" Margin="0,18,0,0"/>
+         <Button Content="Website  ↗" Click="OpenWebsite_Click" HorizontalAlignment="Left" Background="#C69A43" Foreground="#20242B" Padding="18,9" Margin="0,18,0,0"/>
         </StackPanel>
        </Border>
        <TextBlock Text="OUR SERVICES" FontSize="11" FontWeight="Bold" Foreground="#77808C" Margin="0,0,0,12"/>
@@ -303,7 +303,6 @@
         <StackPanel>
          <TextBlock Text="RSS LABEL MAKER" FontWeight="Bold" FontSize="13"/>
          <TextBlock Text="A free, standalone Windows label-design application developed by Razeen Secure Solution. Designed for product information, nutrition values, label layout and Windows-compatible printers." Foreground="#77808C" TextWrapping="Wrap" FontSize="12" Margin="0,8,0,14"/>
-         <TextBlock Text="Website: www.rssapps.net" FontSize="12" Margin="0,2"/>
          <TextBlock Text="Phone: +94 77 115 5504  |  +94 70 155 5504" FontSize="12" Margin="0,2"/>
          <TextBlock Text="Email: riyaz@rssapps.net" FontSize="12" Margin="0,2"/>
         </StackPanel>
@@ -331,8 +330,7 @@
       <StackPanel>
        <TextBlock Text="CONTACT DETAILS" FontSize="11" FontWeight="Bold" Foreground="#77808C" Margin="0,0,0,14"/>
        <TextBlock Text="Razeen Secure Solution" FontSize="17" FontWeight="Bold" TextWrapping="Wrap"/>
-       <TextBlock Text="Website" FontSize="10" Foreground="#77808C" Margin="0,18,0,4"/>
-       <TextBlock Text="www.rssapps.net" FontSize="13" Foreground="#A77A2F"/>
+       <Button Content="Website  ↗" Click="OpenWebsite_Click" HorizontalAlignment="Left" Background="#F8F2E6" Foreground="#98702B" Padding="14,7" Margin="0,18,0,0"/>
        <TextBlock Text="Phone" FontSize="10" Foreground="#77808C" Margin="0,16,0,4"/>
        <TextBlock Text="+94 77 115 5504" FontSize="13"/>
        <TextBlock Text="+94 70 155 5504" FontSize="13" Margin="0,4,0,0"/>
