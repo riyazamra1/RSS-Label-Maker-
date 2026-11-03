@@ -1,0 +1,64 @@
+name: Windows x64 Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    name: Build RSS Label Maker (Windows x64)
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Show .NET SDK
+        run: dotnet --info
+
+      - name: Restore dependencies
+        run: dotnet restore .\RSS.LabelMaker.sln
+
+      - name: Build Release
+        run: dotnet build .\RSS.LabelMaker.sln -c Release --no-restore
+
+      - name: Publish self-contained Windows x64 executable
+        run: >-
+          dotnet publish .\src\RSS.LabelMaker.App\RSS.LabelMaker.App.csproj
+          -c Release
+          -r win-x64
+          --self-contained true
+          --no-restore
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:DebugType=None
+          -p:DebugSymbols=false
+          -o .\artifacts\publish
+
+      - name: Verify published executable
+        shell: pwsh
+        run: |
+          $exe = ".\artifacts\publish\RSS.LabelMaker.exe"
+          if (!(Test-Path $exe)) {
+            throw "Expected executable was not produced: $exe"
+          }
+          Get-Item $exe | Format-List Name,Length,LastWriteTime
+          Get-ChildItem .\artifacts\publish | Select-Object Name,Length
+
+      - name: Upload Windows x64 build
+        uses: actions/upload-artifact@v4
+        with:
+          name: RSS-Label-Maker-Windows-x64
+          path: .\artifacts\publish\
+          if-no-files-found: error
+          retention-days: 14
