@@ -29,6 +29,6 @@ dotnet build .\RSS.LabelMaker.sln -c Release
 dotnet run --project .\src\RSS.LabelMaker.App\RSS.LabelMaker.App.csproj
 ```
 
-This is a native WPF application. It is not a WebView wrapper and does not require RSS Core, a server, sign-in or a subscription.
+This is a native WPF application, not a WebView wrapper. Core label-making works offline without RSS Core or forced sign-in. Automatic English-to-Sinhala/Tamil transliteration has five free uses and then requires Premium; manual Sinhala/Tamil entry remains free and offline.
 
 See [REQUIREMENTS.md](REQUIREMENTS.md) for the approved product specification.
