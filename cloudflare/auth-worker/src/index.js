@@ -18,6 +18,7 @@ async function verifyPassword(password, stored) {
   return actual.length===expected.length && [...actual].reduce((n,c,i)=>n | (c.charCodeAt(0)^expected.charCodeAt(i)),0)===0;
 }
 async function secretHash(value, env) { return digest(`${env.CODE_PEPPER}:${value}`); }
+function constantTimeEqual(a,b) { if(typeof a!=="string"||typeof b!=="string"||a.length!==b.length) return false; let diff=0; for(let i=0;i<a.length;i++) diff|=a.charCodeAt(i)^b.charCodeAt(i); return diff===0; }
 async function rateLimit(env,key,max,seconds) {
   const t=now(), start=t-(t%seconds);
   const row=await env.DB.prepare("SELECT window_start,hits FROM rate_limits WHERE bucket_key=?").bind(key).first();
@@ -74,10 +75,10 @@ export default {
    }
    if(path==="/auth/verify") {
     const email=String(body.email||"").trim().toLowerCase(), code=String(body.code||"").trim();
-    if(!/^[0-9]{6}$/.test(code)) return json({error:"Invalid or expired verification code."},400);
+    if(!/^[0-9]{6}$/.test(code)||!await rateLimit(env,`verify:${ip}:${email}`,12,900)) return json({error:"Invalid or expired verification code."},400);
     const challenge=await env.DB.prepare("SELECT * FROM email_challenges WHERE email=? AND purpose='verify' AND consumed_at IS NULL ORDER BY created_at DESC LIMIT 1").bind(email).first();
     if(!challenge||challenge.expires_at<now()||challenge.attempts>=5) return json({error:"Invalid or expired verification code."},400);
-    const valid=await secretHash(code,env)===challenge.code_hash;
+    const valid=constantTimeEqual(await secretHash(code,env),challenge.code_hash);
     await env.DB.prepare("UPDATE email_challenges SET attempts=attempts+1,consumed_at=CASE WHEN ? THEN ? ELSE consumed_at END WHERE id=?").bind(valid?1:0,now(),challenge.id).run();
     if(!valid) return json({error:"Invalid or expired verification code."},400);
     const account=await env.DB.prepare("SELECT * FROM accounts WHERE email=?").bind(email).first();
@@ -119,9 +120,9 @@ export default {
    }
    if(path==="/auth/reset-password") {
     const email=String(body.email||"").trim().toLowerCase(),code=String(body.code||""),password=String(body.password||"");
-    if(!/^[0-9]{6}$/.test(code)||password.length<12||password.length>128) return json({error:"Invalid request."},400);
+    if(!/^[0-9]{6}$/.test(code)||password.length<12||password.length>128||!await rateLimit(env,`reset-code:${ip}:${email}`,10,900)) return json({error:"Invalid request."},400);
     const challenge=await env.DB.prepare("SELECT * FROM email_challenges WHERE email=? AND purpose='reset' AND consumed_at IS NULL ORDER BY created_at DESC LIMIT 1").bind(email).first();
-    if(!challenge||challenge.expires_at<now()||challenge.attempts>=5||await secretHash(code,env)!==challenge.code_hash) {
+    if(!challenge||challenge.expires_at<now()||challenge.attempts>=5||!constantTimeEqual(await secretHash(code,env),challenge.code_hash)) {
       if(challenge) await env.DB.prepare("UPDATE email_challenges SET attempts=attempts+1 WHERE id=?").bind(challenge.id).run();
       return json({error:"Invalid or expired reset code."},400);
     }
