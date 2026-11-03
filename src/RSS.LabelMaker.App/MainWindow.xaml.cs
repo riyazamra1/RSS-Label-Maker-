@@ -14,6 +14,7 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<ProductRow> _products = new();
     private WatermarkStore? _watermarkStore;
     private ProductStore? _productStore;
+    private string? _editingProductId;
 
     public MainWindow()
     {
@@ -112,9 +113,15 @@ public partial class MainWindow : Window
             ProductStatus.Text = "Enter an English product name before saving.";
             return;
         }
+        if (_productStore is null)
+        {
+            ProductStatus.Text = "Product was not saved: local database is unavailable.";
+            return;
+        }
 
         var product = new ProductRow
         {
+            Id = _editingProductId ?? Guid.NewGuid().ToString("N"),
             English = EnglishName.Text.Trim(),
             Sinhala = SinhalaName.Text.Trim(),
             Tamil = TamilName.Text.Trim(),
@@ -131,28 +138,98 @@ public partial class MainWindow : Window
             Fat = Fat.Text.Trim(),
             Mrp = Mrp.Text.Trim(),
             Importer = Importer.Text.Trim(),
-            Copies = Copies.Text.Trim()
+            Copies = string.IsNullOrWhiteSpace(Copies.Text) ? "1" : Copies.Text.Trim()
         };
-
-        if (_productStore is null)
-        {
-            ProductStatus.Text = "Product was not saved: local database is unavailable.";
-            return;
-        }
 
         try
         {
-            _productStore.Save(product);
-            _products.Add(product);
+            if (_editingProductId is null)
+            {
+                _productStore.Save(product);
+                _products.Add(product);
+                ProductStatus.Text = "Product saved to the local database.";
+            }
+            else
+            {
+                _productStore.Update(product);
+                var index = _products.ToList().FindIndex(item => item.Id == product.Id);
+                if (index >= 0) _products[index] = product;
+                _editingProductId = null;
+                SaveProductButton.Content = "Save Product";
+                ProductStatus.Text = "Product updated in the local database.";
+            }
             ProductCount.Text = _products.Count.ToString();
-            ProductStatus.Text = "Product saved to the local database.";
+            ProductsGrid.Items.Refresh();
+            UpdatePreview();
         }
         catch (Exception ex)
         {
             ProductStatus.Text = $"Product could not be saved: {ex.Message}";
+        }
+    }
+
+    private void EditProduct_Click(object sender, RoutedEventArgs e)
+    {
+        if (ProductsGrid.SelectedItem is not ProductRow product)
+        {
+            ProductStatus.Text = "Select a product from the list first.";
             return;
         }
+        _editingProductId = product.Id;
+        EnglishName.Text = product.English;
+        SinhalaName.Text = product.Sinhala;
+        TamilName.Text = product.Tamil;
+        Mfd.Text = product.Mfd;
+        Expiry.Text = product.Expiry;
+        Batch.Text = product.Batch;
+        NetWeight.Text = product.NetWeight;
+        MfdPrintOnPack.IsChecked = product.MfdPrintOnPack;
+        ExpiryPrintOnPack.IsChecked = product.ExpiryPrintOnPack;
+        BatchPrintOnPack.IsChecked = product.BatchPrintOnPack;
+        NetWeightPrintOnPack.IsChecked = product.NetWeightPrintOnPack;
+        Sugar.Text = product.Sugar;
+        Salt.Text = product.Salt;
+        Fat.Text = product.Fat;
+        Mrp.Text = product.Mrp;
+        Importer.Text = product.Importer;
+        Copies.Text = product.Copies;
+        SaveProductButton.Content = "Update Product";
+        ProductStatus.Text = $"Editing: {product.English}. Change the fields and click Update Product.";
         UpdatePreview();
+    }
+
+    private void DeleteProduct_Click(object sender, RoutedEventArgs e)
+    {
+        if (ProductsGrid.SelectedItem is not ProductRow product)
+        {
+            ProductStatus.Text = "Select a product from the list first.";
+            return;
+        }
+        var answer = MessageBox.Show(this,
+            $"Permanently delete '{product.English}' from this PC?",
+            "Confirm product deletion", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        if (answer != MessageBoxResult.Yes) return;
+        if (_productStore is null)
+        {
+            ProductStatus.Text = "Product was not deleted: local database is unavailable.";
+            return;
+        }
+        try
+        {
+            _productStore.Delete(product.Id);
+            _products.Remove(product);
+            if (_editingProductId == product.Id)
+            {
+                _editingProductId = null;
+                SaveProductButton.Content = "Save Product";
+            }
+            ProductCount.Text = _products.Count.ToString();
+            ProductStatus.Text = $"Deleted '{product.English}'.";
+        }
+        catch (Exception ex)
+        {
+            ProductStatus.Text = $"Product could not be deleted: {ex.Message}";
+        }
     }
 
     private void ApplyLayout_Click(object sender, RoutedEventArgs e)
@@ -416,6 +493,31 @@ public partial class MainWindow : Window
             command.Parameters.AddWithValue("$json", json);
             command.Parameters.AddWithValue("$createdUtc", DateTime.UtcNow.ToString("O"));
             command.ExecuteNonQuery();
+        }
+
+        public void Update(ProductRow product)
+        {
+            ArgumentNullException.ThrowIfNull(product);
+            var json = System.Text.Json.JsonSerializer.Serialize(product);
+            using var connection = OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE Products SET DataJson = $json WHERE Id = $id;";
+            command.Parameters.AddWithValue("$id", product.Id);
+            command.Parameters.AddWithValue("$json", json);
+            if (command.ExecuteNonQuery() != 1)
+                throw new InvalidOperationException("The product record no longer exists in the local database.");
+        }
+
+        public void Delete(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                throw new ArgumentException("A product ID is required.", nameof(id));
+            using var connection = OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = "DELETE FROM Products WHERE Id = $id;";
+            command.Parameters.AddWithValue("$id", id);
+            if (command.ExecuteNonQuery() != 1)
+                throw new InvalidOperationException("The product record no longer exists in the local database.");
         }
 
         private Microsoft.Data.Sqlite.SqliteConnection OpenConnection()
