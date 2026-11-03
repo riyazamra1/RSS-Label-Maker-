@@ -38,6 +38,7 @@ public partial class MainWindow : Window
         ShowPage("Dashboard");
         BuildClockAndSettingsUi();
         LoadAppSettings();
+        WireDesignerOptionPersistence();
         UpdateClock();
 
         _clockTimer.Interval = TimeSpan.FromSeconds(1);
@@ -229,10 +230,6 @@ public partial class MainWindow : Window
         });
         _barcodeEnabled = SettingCheckBox("Enable barcode");
         _qrEnabled = SettingCheckBox("Enable QR code");
-        _barcodeEnabled.Checked += (_, _) => SaveSettingsSilently();
-        _barcodeEnabled.Unchecked += (_, _) => SaveSettingsSilently();
-        _qrEnabled.Checked += (_, _) => SaveSettingsSilently();
-        _qrEnabled.Unchecked += (_, _) => SaveSettingsSilently();
         designerPanel.Children.Add(_barcodeEnabled);
         designerPanel.Children.Add(_qrEnabled);
         designerPanel.Children.Add(new TextBlock
@@ -308,6 +305,20 @@ public partial class MainWindow : Window
 
     private static SolidColorBrush Brush(string color) =>
         new((Color)ColorConverter.ConvertFromString(color));
+
+    private void WireDesignerOptionPersistence()
+    {
+        if (_barcodeEnabled is not null)
+        {
+            _barcodeEnabled.Checked += (_, _) => SaveSettingsSilently();
+            _barcodeEnabled.Unchecked += (_, _) => SaveSettingsSilently();
+        }
+        if (_qrEnabled is not null)
+        {
+            _qrEnabled.Checked += (_, _) => SaveSettingsSilently();
+            _qrEnabled.Unchecked += (_, _) => SaveSettingsSilently();
+        }
+    }
 
     private void LoadAppSettings()
     {
