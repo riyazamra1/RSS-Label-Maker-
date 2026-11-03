@@ -105,10 +105,30 @@
        </Grid>
        <Grid Margin="0,12,0,0">
         <Grid.ColumnDefinitions><ColumnDefinition Width="2*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-        <StackPanel Grid.Column="0" Margin="0,0,12,0"><TextBlock Text="Import By" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="Importer" TextChanged="ProductField_TextChanged"/></StackPanel>
+        <StackPanel Grid.Column="0" Margin="0,0,12,0"><TextBlock Text="Import By (text)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="Importer" TextChanged="ProductField_TextChanged"/></StackPanel>
         <StackPanel Grid.Column="1" Margin="0,0,12,0"><TextBlock Text="Copies" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="Copies" Text="1"/></StackPanel>
         <StackPanel Grid.Column="2" VerticalAlignment="Bottom"><Button x:Name="SaveProductButton" Content="Save Product" Click="SaveProduct_Click" Background="#C69A43" Foreground="#20242B" Padding="18,9"/></StackPanel>
        </Grid>
+       <Border Background="#F7F8FA" Padding="12" Margin="0,12,0,0" CornerRadius="6">
+        <StackPanel>
+         <TextBlock Text="BOX &amp; PER-PIECE PRICING" FontWeight="Bold" FontSize="11" Foreground="#77808C" Margin="0,0,0,8"/>
+         <Grid>
+          <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+          <StackPanel Grid.Column="0" Margin="0,0,10,0"><TextBlock Text="Pieces per Box" FontSize="11"/><TextBox x:Name="PiecesPerBox" TextChanged="ProductField_TextChanged" Margin="0,4,0,0"/></StackPanel>
+          <StackPanel Grid.Column="1" Margin="0,0,10,0"><TextBlock Text="Box Price (Rs.)" FontSize="11"/><TextBox x:Name="BoxPrice" TextChanged="ProductField_TextChanged" Margin="0,4,0,0"/></StackPanel>
+          <StackPanel Grid.Column="2"><TextBlock Text="Per-piece price" FontSize="11"/><CheckBox x:Name="ShowPerPiecePrice" Content="Show on label" Checked="PerPiecePricing_Changed" Unchecked="PerPiecePricing_Changed" Margin="0,7,0,0"/></StackPanel>
+         </Grid>
+         <StackPanel x:Name="PerPiecePricePanel" Visibility="Collapsed" Margin="0,8,0,0">
+          <TextBlock Text="Calculation mode" FontSize="11"/>
+          <ComboBox x:Name="PerPiecePricingMode" SelectedIndex="0" SelectionChanged="PerPiecePricing_Changed" Margin="0,4,0,6">
+           <ComboBoxItem Content="Automatic — Box Price ÷ Pieces per Box"/>
+           <ComboBoxItem Content="Manual — enter per-piece price"/>
+          </ComboBox>
+          <TextBox x:Name="ManualPerPiecePrice" Visibility="Collapsed" TextChanged="ProductField_TextChanged" ToolTip="Manual per-piece price (Rs.)"/>
+          <TextBlock x:Name="CalculatedPerPiecePrice" Text="Enter a valid box price and pieces per box." Foreground="#4E7B5C" FontSize="11"/>
+         </StackPanel>
+        </StackPanel>
+       </Border>
        <TextBlock x:Name="ProductStatus" Foreground="#4E7B5C" FontSize="11" Margin="0,10,0,0"/>
       </StackPanel>
      </Border>
@@ -174,7 +194,10 @@
            <TextBlock x:Name="PreviewNetWeight" Text="N.Wt :  —"/>
           </StackPanel>
          </Grid>
-         <TextBlock x:Name="PreviewMrp" Grid.Row="3" Text="M.R.P. (Rs.)  —" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,8"/>
+         <StackPanel Grid.Row="3" Margin="0,8">
+          <TextBlock x:Name="PreviewMrp" Text="M.R.P. (Rs.)  —" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center"/>
+          <TextBlock x:Name="PreviewPerPiece" Text="" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" Visibility="Collapsed"/>
+         </StackPanel>
          <Grid Grid.Row="4">
           <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
           <Border Background="#C94343" Margin="1" Padding="5"><StackPanel><TextBlock Text="SUGAR" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" FontSize="11"/><TextBlock Text="සීනි  •  சர்க்கரை" Foreground="White" FontSize="8" HorizontalAlignment="Center"/><TextBlock x:Name="PreviewSugar" Text="— g/100g" Background="White" Foreground="#222" HorizontalAlignment="Stretch" TextAlignment="Center" Padding="2"/></StackPanel></Border>
