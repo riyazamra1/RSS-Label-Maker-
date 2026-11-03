@@ -16,7 +16,7 @@ Native Windows desktop label-design and printing application by Razeen Secure So
 - Reference-inspired food-label preview with the three nutrition panels.
 - Custom label width/height entry and nominal A4/A5/Letter row/column estimate.
 - Windows-installed printer discovery, a 100 mm calibration-page print action, and a first product-label print renderer for the selected saved product. The renderer uses the Designer's label dimensions, product copies, nutrition panels, Print on Pack text, Import By / Distributed By details, and the saved watermark opacity.
-- Multi-page print preview with A4, A5, Letter and custom paper dimensions, portrait/landscape orientation, page margins, label gaps, automatic rows/columns, page navigation and multi-page print submission. Preview and print share the same rendered sheet visuals.
+- Multi-page print preview with A4, A5, Letter and custom paper dimensions, portrait/landscape orientation, independently adjustable top/bottom/left/right margins, horizontal/vertical label gaps, automatic rows/columns, page navigation and multi-page print submission. Preview and print share the same rendered sheet visuals.
 - Logo watermark image selection, local binary persistence in SQLite, remove action and continuously adjustable 0–100% opacity setting. The current watermark preview is not yet integrated into final label print/PDF rendering.
 
 ## Account registration and offline use
