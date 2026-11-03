@@ -395,7 +395,9 @@ M4 — Custom dimensions, A4 layout engine and preview.
 M5 — Designer editing tools and barcode/QR.  
 M6 — Windows printing, calibration and PDF.  
 M7 — Excel/CSV bulk import.  
-M8 — RSS Core identity, license-key activation, quota enforcement, device licensing and shared-user access.\nM9 — Google Drive encrypted backup and restore.\nM10 — QA, installer, documentation and release.
+M8 — RSS Core identity, license-key activation, quota enforcement, device licensing and shared-user access.
+M9 — Google Drive encrypted backup and restore.
+M10 — QA, installer, documentation and release.
 M9 — QA, installer, documentation and release.
 
 Do not mark a milestone complete without code, build/test evidence and functional verification. Do not deploy web services; this is a Windows desktop application.
