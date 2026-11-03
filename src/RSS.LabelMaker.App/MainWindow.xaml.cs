@@ -215,8 +215,7 @@ public partial class MainWindow : Window
 
     private void BuildDesignerOptions()
     {
-        var designerPanel = DesignerPage.Children.OfType<Grid>().FirstOrDefault()?
-            .Children.OfType<Border>().FirstOrDefault()?.Child as StackPanel;
+        var designerPanel = DesignerPage.Children.OfType<Border>().FirstOrDefault()?.Child as StackPanel;
         if (designerPanel is null) return;
 
         designerPanel.Children.Add(new Separator { Margin = new Thickness(0, 14, 0, 12) });
@@ -230,6 +229,10 @@ public partial class MainWindow : Window
         });
         _barcodeEnabled = SettingCheckBox("Enable barcode");
         _qrEnabled = SettingCheckBox("Enable QR code");
+        _barcodeEnabled.Checked += (_, _) => SaveSettingsSilently();
+        _barcodeEnabled.Unchecked += (_, _) => SaveSettingsSilently();
+        _qrEnabled.Checked += (_, _) => SaveSettingsSilently();
+        _qrEnabled.Unchecked += (_, _) => SaveSettingsSilently();
         designerPanel.Children.Add(_barcodeEnabled);
         designerPanel.Children.Add(_qrEnabled);
         designerPanel.Children.Add(new TextBlock
@@ -336,7 +339,9 @@ public partial class MainWindow : Window
         if (_qrEnabled is not null) _qrEnabled.IsChecked = _settings.QrEnabled;
     }
 
-    private void SaveSettings_Click(object sender, RoutedEventArgs e)
+    private void SaveSettings_Click(object sender, RoutedEventArgs e) => SaveSettingsSilently();
+
+    private void SaveSettingsSilently()
     {
         try
         {
