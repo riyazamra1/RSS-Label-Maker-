@@ -390,7 +390,7 @@ public partial class MainWindow : Window
         }
         catch
         {
-            zone = TimeZoneInfo.FindSystemTimeZoneById("Sri Lanka Standard Time");
+            zone = TimeZoneInfo.Local;
         }
 
         var localTime = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, zone);
