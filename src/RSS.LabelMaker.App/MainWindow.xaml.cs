@@ -818,8 +818,11 @@ public partial class MainWindow : Window
             var col = i % columns;
             var row = i / columns;
             dc.PushTransform(new TranslateTransform(marginLeft + col * (labelWidth + horizontalGap), marginTop + row * (labelHeight + verticalGap)));
+            // Clip all artwork, including the watermark, to this individual label.
+            dc.PushClip(new RectangleGeometry(new Rect(0, 0, labelWidth, labelHeight)));
             DrawProductLabel(dc, product, labelWidth, labelHeight);
-            dc.Pop();
+            dc.Pop(); // label clip
+            dc.Pop(); // label position
         }
         return visual;
     }
