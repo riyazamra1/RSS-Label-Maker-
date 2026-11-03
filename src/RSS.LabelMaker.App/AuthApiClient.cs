@@ -8,7 +8,7 @@ namespace RSS.LabelMaker.App;
 internal sealed class AuthApiClient
 {
     // Production endpoint must be deployed and configured before release.
-    public const string BaseUrl = "https://auth.rssapps.net";
+    private static readonly string BaseUrl = Environment.GetEnvironmentVariable("RSS_LABEL_MAKER_AUTH_URL") ?? "https://auth.rssapps.net";
     private static readonly HttpClient Http = new() { BaseAddress = new Uri(BaseUrl), Timeout = TimeSpan.FromSeconds(12) };
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
