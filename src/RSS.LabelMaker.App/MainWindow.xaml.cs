@@ -5,6 +5,7 @@ using System.Printing;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
+using System.Windows.Media;
 using Microsoft.Win32;
 
 namespace RSS.LabelMaker.App;
@@ -407,7 +408,83 @@ public partial class MainWindow : Window
 
     private void TestPrint_Click(object sender, RoutedEventArgs e)
     {
-        PrintStatus.Text = "Printer discovery works. Actual-size label rendering and test-page printing are scheduled for the printing milestone.";
+        try
+        {
+            using var server = new LocalPrintServer();
+            var dialog = new PrintDialog();
+
+            if (PrinterList.SelectedItem is string selectedPrinter &&
+                !string.IsNullOrWhiteSpace(selectedPrinter))
+            {
+                dialog.PrintQueue = server.GetPrintQueue(selectedPrinter);
+            }
+
+            if (dialog.ShowDialog() != true)
+            {
+                PrintStatus.Text = "Calibration print cancelled.";
+                return;
+            }
+
+            const double millimetresToDips = 96d / 25.4d;
+            const double squareSize = 100d * millimetresToDips;
+            const double inset = 5d * millimetresToDips;
+
+            var calibrationVisual = new DrawingVisual();
+            using (var drawing = calibrationVisual.RenderOpen())
+            {
+                var borderPen = new Pen(Brushes.Black, 0.8);
+                var guidePen = new Pen(Brushes.Gray, 0.5);
+                drawing.DrawRectangle(Brushes.White, borderPen,
+                    new Rect(0, 0, squareSize, squareSize));
+
+                // A measured 100 mm square with 50 mm centre guides.
+                drawing.DrawLine(guidePen,
+                    new Point(squareSize / 2, inset),
+                    new Point(squareSize / 2, squareSize - inset));
+                drawing.DrawLine(guidePen,
+                    new Point(inset, squareSize / 2),
+                    new Point(squareSize - inset, squareSize / 2));
+
+                var title = new FormattedText(
+                    "RSS LABEL MAKER - PRINTER CALIBRATION",
+                    CultureInfo.CurrentCulture,
+                    FlowDirection.LeftToRight,
+                    new Typeface("Arial"),
+                    9,
+                    Brushes.Black,
+                    1.0);
+                drawing.DrawText(title, new Point(inset, inset));
+
+                var dimension = new FormattedText(
+                    "Measure outer border: 100 mm × 100 mm",
+                    CultureInfo.CurrentCulture,
+                    FlowDirection.LeftToRight,
+                    new Typeface("Arial"),
+                    8,
+                    Brushes.Black,
+                    1.0);
+                drawing.DrawText(dimension,
+                    new Point(inset, squareSize - inset - dimension.Height));
+
+                var centreMark = new FormattedText(
+                    "50 mm",
+                    CultureInfo.CurrentCulture,
+                    FlowDirection.LeftToRight,
+                    new Typeface("Arial"),
+                    8,
+                    Brushes.Black,
+                    1.0);
+                drawing.DrawText(centreMark,
+                    new Point(squareSize / 2 + 3, squareSize / 2 + 3));
+            }
+
+            dialog.PrintVisual(calibrationVisual, "RSS Label Maker - 100 mm calibration");
+            PrintStatus.Text = "Calibration page sent to the selected printer. Measure the outer square; it should be 100 mm on each side. Driver scaling may affect the result.";
+        }
+        catch (Exception ex)
+        {
+            PrintStatus.Text = $"Calibration page could not be printed: {ex.Message}";
+        }
     }
 
     private sealed class ProductRow
