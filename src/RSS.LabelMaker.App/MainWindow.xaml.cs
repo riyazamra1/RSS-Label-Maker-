@@ -65,6 +65,7 @@ public partial class MainWindow : Window
             foreach (var profile in _companyProfileStore.Load()) _companyProfiles.Add(profile);
             CompanyProfilesGrid.ItemsSource = _companyProfiles;
             CompanyProfileCount.Text = _companyProfiles.Count.ToString();
+            RefreshProductProfileChoices();
         }
         catch (Exception ex)
         {
@@ -184,7 +185,13 @@ public partial class MainWindow : Window
             Salt = Salt.Text.Trim(),
             Fat = Fat.Text.Trim(),
             Mrp = Mrp.Text.Trim(),
-            Importer = Importer.Text.Trim(),
+            Importer = ImportByName.Text.Trim(),
+            ImportByProfileId = ImportByProfile.SelectedValue?.ToString() ?? "",
+            ImportByName = ImportByName.Text.Trim(),
+            ImportByAddress = ImportByAddress.Text.Trim(),
+            DistributedByProfileId = DistributedByProfile.SelectedValue?.ToString() ?? "",
+            DistributedByName = DistributedByName.Text.Trim(),
+            DistributedByAddress = DistributedByAddress.Text.Trim(),
             PiecesPerBox = PiecesPerBox.Text.Trim(),
             BoxPrice = BoxPrice.Text.Trim(),
             ShowPerPiecePrice = ShowPerPiecePrice.IsChecked == true,
@@ -243,7 +250,12 @@ public partial class MainWindow : Window
         Salt.Text = product.Salt;
         Fat.Text = product.Fat;
         Mrp.Text = product.Mrp;
-        Importer.Text = product.Importer;
+        ImportByProfile.SelectedValue = product.ImportByProfileId;
+        DistributedByProfile.SelectedValue = product.DistributedByProfileId;
+        ImportByName.Text = string.IsNullOrWhiteSpace(product.ImportByName) ? product.Importer : product.ImportByName;
+        ImportByAddress.Text = product.ImportByAddress;
+        DistributedByName.Text = product.DistributedByName;
+        DistributedByAddress.Text = product.DistributedByAddress;
         PiecesPerBox.Text = product.PiecesPerBox;
         BoxPrice.Text = product.BoxPrice;
         ShowPerPiecePrice.IsChecked = product.ShowPerPiecePrice;
@@ -291,6 +303,34 @@ public partial class MainWindow : Window
     }
 
 
+    private void RefreshProductProfileChoices()
+    {
+        var importSelection = ImportByProfile?.SelectedValue?.ToString();
+        var distributeSelection = DistributedByProfile?.SelectedValue?.ToString();
+        ImportByProfile.ItemsSource = _companyProfiles.Where(p => p.ProfileType == "Import By").ToList();
+        DistributedByProfile.ItemsSource = _companyProfiles.Where(p => p.ProfileType == "Distributed By").ToList();
+        ImportByProfile.SelectedValue = importSelection;
+        DistributedByProfile.SelectedValue = distributeSelection;
+    }
+
+    private void ImportByProfile_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ImportByProfile.SelectedItem is CompanyProfileRow profile)
+        {
+            ImportByName.Text = profile.Name;
+            ImportByAddress.Text = profile.Address;
+        }
+    }
+
+    private void DistributedByProfile_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (DistributedByProfile.SelectedItem is CompanyProfileRow profile)
+        {
+            DistributedByName.Text = profile.Name;
+            DistributedByAddress.Text = profile.Address;
+        }
+    }
+
     private void SaveCompanyProfile_Click(object sender, RoutedEventArgs e)
     {
         if (_companyProfileStore is null) { CompanyProfileStatus.Text = "Company profile storage is unavailable."; return; }
@@ -318,6 +358,7 @@ public partial class MainWindow : Window
             }
             CompanyProfileCount.Text = _companyProfiles.Count.ToString();
             CompanyProfilesGrid.Items.Refresh();
+            RefreshProductProfileChoices();
         }
         catch (Exception ex) { CompanyProfileStatus.Text = $"Profile could not be saved: {ex.Message}"; }
     }
@@ -345,6 +386,7 @@ public partial class MainWindow : Window
             _companyProfileStore.Delete(profile.Id); _companyProfiles.Remove(profile);
             if (_editingCompanyProfileId == profile.Id) { _editingCompanyProfileId = null; SaveCompanyProfileButton.Content = "Save Profile"; }
             CompanyProfileCount.Text = _companyProfiles.Count.ToString();
+            RefreshProductProfileChoices();
             CompanyProfileStatus.Text = $"Deleted '{profile.Name}'.";
         }
         catch (Exception ex) { CompanyProfileStatus.Text = $"Profile could not be deleted: {ex.Message}"; }
@@ -593,6 +635,10 @@ public partial class MainWindow : Window
         PreviewExpiry.Text = FormatPreviewRow("EXP.D", Expiry.Text, ExpiryPrintOnPack.IsChecked == true);
         PreviewBatch.Text = FormatPreviewRow("B.No", Batch.Text, BatchPrintOnPack.IsChecked == true);
         PreviewNetWeight.Text = FormatPreviewRow("N.Wt", NetWeight.Text, NetWeightPrintOnPack.IsChecked == true);
+        PreviewImporter.Text = string.IsNullOrWhiteSpace(ImportByName.Text) && string.IsNullOrWhiteSpace(ImportByAddress.Text)
+            ? "" : $"Import By: {ImportByName.Text.Trim()} {ImportByAddress.Text.Trim()}".Trim();
+        PreviewDistributor.Text = string.IsNullOrWhiteSpace(DistributedByName.Text) && string.IsNullOrWhiteSpace(DistributedByAddress.Text)
+            ? "" : $"Distributed By: {DistributedByName.Text.Trim()} {DistributedByAddress.Text.Trim()}".Trim();
         PreviewMrp.Text = $"M.R.P. (Rs.)  {(string.IsNullOrWhiteSpace(Mrp.Text) ? "—" : Mrp.Text.Trim())}";
         if (PreviewPerPiece is not null)
         {
@@ -820,6 +866,12 @@ public partial class MainWindow : Window
         public string Fat { get; init; } = "";
         public string Mrp { get; init; } = "";
         public string Importer { get; init; } = "";
+        public string ImportByProfileId { get; init; } = "";
+        public string ImportByName { get; init; } = "";
+        public string ImportByAddress { get; init; } = "";
+        public string DistributedByProfileId { get; init; } = "";
+        public string DistributedByName { get; init; } = "";
+        public string DistributedByAddress { get; init; } = "";
         public string PiecesPerBox { get; init; } = "";
         public string BoxPrice { get; init; } = "";
         public bool ShowPerPiecePrice { get; init; }
