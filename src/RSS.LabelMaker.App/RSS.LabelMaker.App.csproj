@@ -8,6 +8,7 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <RootNamespace>RSS.LabelMaker.App</RootNamespace>
     <AssemblyName>RSS.LabelMaker</AssemblyName>
+    <Version>1.0.0</Version>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.0" />
