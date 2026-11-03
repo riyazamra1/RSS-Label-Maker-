@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.Net.Mail;
 using System.Globalization;
 using System.IO;
 using System.Printing;
@@ -88,6 +90,8 @@ public partial class MainWindow : Window
         PrintPage.Visibility = page == "Print" ? Visibility.Visible : Visibility.Collapsed;
         ImportPage.Visibility = page == "Import" ? Visibility.Visible : Visibility.Collapsed;
         SettingsPage.Visibility = page == "Settings" ? Visibility.Visible : Visibility.Collapsed;
+        AboutPage.Visibility = page == "About" ? Visibility.Visible : Visibility.Collapsed;
+        ContactPage.Visibility = page == "Contact" ? Visibility.Visible : Visibility.Collapsed;
         CompanyProfilesPage.Visibility = page == "CompanyProfiles" ? Visibility.Visible : Visibility.Collapsed;
 
         PageTitle.Text = page switch
@@ -98,6 +102,8 @@ public partial class MainWindow : Window
             "Print" => "Print Manager",
             "Import" => "Import / Export",
             "CompanyProfiles" => "Import By & Distributed By",
+            "About" => "About Razeen Secure Solution",
+            "Contact" => "Contact RSS",
             "Settings" => "Settings",
             _ => "Dashboard"
         };
@@ -109,10 +115,12 @@ public partial class MainWindow : Window
             "Print" => "Select a Windows printer and prepare accurate output",
             "Import" => "Bring product data in and export finished labels",
             "CompanyProfiles" => "Save reusable company and person details for product labels",
+            "About" => "Company information and services",
+            "Contact" => "Send an enquiry to Razeen Secure Solution",
             "Settings" => "Configure this local application",
             _ => "Your label production workspace"
         };
-        var buttons = new[] { NavDashboard, NavProducts, NavDesigner, NavTemplates, NavPrint, NavImport, NavCompanyProfiles, NavSettings };
+        var buttons = new[] { NavDashboard, NavProducts, NavDesigner, NavTemplates, NavPrint, NavImport, NavCompanyProfiles, NavAbout, NavContact, NavSettings };
         foreach (var item in buttons)
         {
             var selected = Equals(item.Tag?.ToString(), page);
@@ -347,6 +355,73 @@ public partial class MainWindow : Window
         _editingCompanyProfileId = null; CompanyProfileType.SelectedIndex = 0;
         CompanyProfileName.Clear(); CompanyProfileAddress.Clear(); CompanyProfileContact.Clear();
         SaveCompanyProfileButton.Content = "Save Profile"; CompanyProfileStatus.Text = "Ready for a new profile.";
+    }
+
+
+    private void OpenWebsite_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo("https://www.rssapps.net") { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"Could not open the RSS website. {ex.Message}",
+                "Open website", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void SendContactMessage_Click(object sender, RoutedEventArgs e)
+    {
+        var name = ContactName.Text.Trim();
+        var email = ContactEmail.Text.Trim();
+        var phone = ContactPhone.Text.Trim();
+        var subject = ContactSubject.Text.Trim();
+        var message = ContactMessage.Text.Trim();
+
+        if (name.Length == 0 || email.Length == 0 || subject.Length == 0 || message.Length == 0)
+        {
+            ContactStatus.Text = "Please complete your name, email, subject and message.";
+            return;
+        }
+        if (name.Length > 120 || email.Length > 254 || phone.Length > 40 ||
+            subject.Length > 180 || message.Length > 5000)
+        {
+            ContactStatus.Text = "One or more fields exceed the allowed length. Please shorten your message.";
+            return;
+        }
+        try
+        {
+            _ = new MailAddress(email);
+        }
+        catch (FormatException)
+        {
+            ContactStatus.Text = "Enter a valid reply email address.";
+            return;
+        }
+
+        var body = $"Name: {name}\nEmail: {email}\nPhone: {phone}\n\nMessage:\n{message}";
+        var mailto = "mailto:riyaz@rssapps.net?subject=" + Uri.EscapeDataString(subject) +
+                     "&body=" + Uri.EscapeDataString(body);
+        try
+        {
+            Process.Start(new ProcessStartInfo(mailto) { UseShellExecute = true });
+            ContactStatus.Text = "Your default email app has opened with this message. Review it and press Send to deliver it to RSS.";
+        }
+        catch (Exception ex)
+        {
+            ContactStatus.Text = $"Could not open an email app. You can email riyaz@rssapps.net directly. Details: {ex.Message}";
+        }
+    }
+
+    private void ClearContactForm_Click(object sender, RoutedEventArgs e)
+    {
+        ContactName.Clear();
+        ContactEmail.Clear();
+        ContactPhone.Clear();
+        ContactSubject.Clear();
+        ContactMessage.Clear();
+        ContactStatus.Text = "Form cleared.";
     }
 
     private void ApplyLayout_Click(object sender, RoutedEventArgs e)
