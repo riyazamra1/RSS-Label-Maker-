@@ -1,0 +1,51 @@
+<Window x:Class="RSS.LabelMaker.App.AuthWindow"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Title="RSS Label Maker — Account" Height="690" Width="520" MinHeight="620" MinWidth="460"
+ WindowStartupLocation="CenterScreen" Background="#F4F5F7" ResizeMode="CanResize">
+ <Grid Margin="28">
+  <Border Background="White" CornerRadius="14" Padding="28">
+   <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel>
+     <TextBlock Text="RSS LABEL MAKER" FontSize="23" FontWeight="Bold" Foreground="#20242B"/>
+     <TextBlock Text="Razeen Secure Solution" Foreground="#77808C" Margin="0,3,0,20"/>
+     <TextBlock Text="Account access" FontSize="21" FontWeight="SemiBold" Margin="0,0,0,5"/>
+     <TextBlock Text="Register and verify your email before using the application. Your label data stays on this PC." TextWrapping="Wrap" Foreground="#66707C" Margin="0,0,0,18"/>
+     <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+      <Button Content="Register" Click="ShowRegister_Click" Margin="0,0,8,0"/>
+      <Button Content="Sign in" Click="ShowLogin_Click" Margin="0,0,8,0"/>
+      <Button Content="Verify email" Click="ShowVerify_Click"/>
+     </StackPanel>
+     <StackPanel x:Name="RegisterPanel">
+      <TextBlock Text="Full name"/><TextBox x:Name="RegisterName" Margin="0,4,0,12"/>
+      <TextBlock Text="Email address"/><TextBox x:Name="RegisterEmail" Margin="0,4,0,12"/>
+      <TextBlock Text="Password (12–128 characters)"/><PasswordBox x:Name="RegisterPassword" Padding="10,8" Margin="0,4,0,12"/>
+      <TextBlock Text="Confirm password"/><PasswordBox x:Name="ConfirmPassword" Padding="10,8" Margin="0,4,0,14"/>
+      <Button Content="Create account and send code" Background="#C69A43" Foreground="#20242B" Click="Register_Click"/>
+     </StackPanel>
+     <StackPanel x:Name="LoginPanel" Visibility="Collapsed">
+      <TextBlock Text="Email address"/><TextBox x:Name="LoginEmail" Margin="0,4,0,12"/>
+      <TextBlock Text="Password"/><PasswordBox x:Name="LoginPassword" Padding="10,8" Margin="0,4,0,14"/>
+      <Button Content="Sign in" Background="#C69A43" Click="Login_Click"/>
+      <Button Content="Forgot password?" Click="ShowForgot_Click" Margin="0,8,0,0"/>
+     </StackPanel>
+     <StackPanel x:Name="VerifyPanel" Visibility="Collapsed">
+      <TextBlock Text="Email address"/><TextBox x:Name="VerifyEmail" Margin="0,4,0,12"/>
+      <TextBlock Text="6-digit verification code"/><TextBox x:Name="VerifyCode" MaxLength="6" Margin="0,4,0,14"/>
+      <Button Content="Verify email and continue" Background="#C69A43" Click="Verify_Click"/>
+      <Button Content="Resend verification code" Click="Resend_Click" Margin="0,8,0,0"/>
+     </StackPanel>
+     <StackPanel x:Name="ForgotPanel" Visibility="Collapsed">
+      <TextBlock Text="Account email"/><TextBox x:Name="ForgotEmail" Margin="0,4,0,12"/>
+      <Button Content="Send password reset code" Click="Forgot_Click"/>
+      <TextBlock Text="Reset code"/><TextBox x:Name="ResetCode" MaxLength="6" Margin="0,4,0,12"/>
+      <TextBlock Text="New password (12–128 characters)"/><PasswordBox x:Name="ResetPassword" Padding="10,8" Margin="0,4,0,14"/>
+      <Button Content="Reset password" Background="#C69A43" Click="Reset_Click"/>
+     </StackPanel>
+     <TextBlock x:Name="StatusText" TextWrapping="Wrap" Foreground="#A33B32" Margin="0,18,0,0"/>
+     <TextBlock Text="After verification, this PC can continue working offline. Product and label data are not uploaded." TextWrapping="Wrap" Foreground="#77808C" FontSize="11" Margin="0,22,0,0"/>
+    </StackPanel>
+   </ScrollViewer>
+  </Border>
+ </Grid>
+</Window>
