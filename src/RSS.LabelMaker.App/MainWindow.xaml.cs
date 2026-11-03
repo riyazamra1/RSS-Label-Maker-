@@ -1,6 +1,8 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.IO;
 using System.Printing;
+using Microsoft.Data.Sqlite;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
@@ -34,6 +36,8 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         ProductsGrid.ItemsSource = _products;
+        InitializeProductDatabase();
+        LoadProducts();
         RefreshPrinters();
         ShowPage("Dashboard");
         BuildClockAndSettingsUi();
@@ -478,24 +482,146 @@ public partial class MainWindow : Window
             ProductStatus.Text = "Enter an English product name before saving.";
             return;
         }
-
-        _products.Add(new ProductRow
+        var product = new ProductRow
         {
-            English = EnglishName.Text.Trim(),
-            Sinhala = SinhalaName.Text.Trim(),
-            Tamil = TamilName.Text.Trim(),
-            Batch = Batch.Text.Trim(),
-            Mrp = Mrp.Text.Trim()
-        });
+            English = EnglishName.Text.Trim(), Sinhala = SinhalaName.Text.Trim(), Tamil = TamilName.Text.Trim(),
+            Mfd = Mfd.Text.Trim(), Expiry = Expiry.Text.Trim(), Batch = Batch.Text.Trim(),
+            NetWeight = NetWeight.Text.Trim(), Sugar = Sugar.Text.Trim(), Salt = Salt.Text.Trim(), Fat = Fat.Text.Trim(),
+            Mrp = Mrp.Text.Trim(), Importer = Importer.Text.Trim(), Copies = ParsePositiveInt(Copies.Text, 1),
+            PrintMfd = PrintMfd.IsChecked == true, PrintExpiry = PrintExpiry.IsChecked == true,
+            PrintBatch = PrintBatch.IsChecked == true, PrintNetWeight = PrintNetWeight.IsChecked == true
+        };
+        try
+        {
+            using var connection = new SqliteConnection($"Data Source={GetDatabasePath()}");
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                INSERT INTO Products
+                (English, Sinhala, Tamil, Mfd, Expiry, Batch, NetWeight, Sugar, Salt, Fat, Mrp, Importer, Copies,
+                 PrintMfd, PrintExpiry, PrintBatch, PrintNetWeight, CreatedUtc)
+                VALUES
+                ($english, $sinhala, $tamil, $mfd, $expiry, $weight, $sugar, $salt, $fat, $mrp, $importer, $copies,
+                 $printMfd, $printExpiry, $printBatch, $printWeight, $createdUtc);
+                """;
+            command.Parameters.AddWithValue("$english", product.English);
+            command.Parameters.AddWithValue("$sinhala", product.Sinhala);
+            command.Parameters.AddWithValue("$tamil", product.Tamil);
+            command.Parameters.AddWithValue("$mfd", product.Mfd);
+            command.Parameters.AddWithValue("$expiry", product.Expiry);
+            command.Parameters.AddWithValue("$batch", product.Batch);
+            command.Parameters.AddWithValue("$weight", product.NetWeight);
+            command.Parameters.AddWithValue("$sugar", product.Sugar);
+            command.Parameters.AddWithValue("$salt", product.Salt);
+            command.Parameters.AddWithValue("$fat", product.Fat);
+            command.Parameters.AddWithValue("$mrp", product.Mrp);
+            command.Parameters.AddWithValue("$importer", product.Importer);
+            command.Parameters.AddWithValue("$copies", product.Copies);
+            command.Parameters.AddWithValue("$printMfd", product.PrintMfd ? 1 : 0);
+            command.Parameters.AddWithValue("$printExpiry", product.PrintExpiry ? 1 : 0);
+            command.Parameters.AddWithValue("$printBatch", product.PrintBatch ? 1 : 0);
+            command.Parameters.AddWithValue("$printWeight", product.PrintNetWeight ? 1 : 0);
+            command.Parameters.AddWithValue("$createdUtc", DateTimeOffset.UtcNow.ToString("O"));
+            command.ExecuteNonQuery();
+            _products.Add(product);
+            ProductCount.Text = _products.Count.ToString();
+            ProductStatus.Text = "Product saved to the local SQLite database.";
+            UpdateLabelPreview(product);
+        }
+        catch (Exception ex) { ProductStatus.Text = $"Product was not saved: {ex.Message}"; }
+    }
+
+    private void UpdateLabelPreview(ProductRow product)
+    {
+        PreviewEnglish.Text = string.IsNullOrWhiteSpace(product.English) ? "PRODUCT NAME" : product.English.ToUpperInvariant();
+        PreviewLocal.Text = $"{product.Sinhala}  •  {product.Tamil}".Trim(' ', '•');
+        PreviewMfd.Text = $"M.F.D :  {PackValue(product.Mfd, product.PrintMfd)}";
+        PreviewExpiry.Text = $"EXP.D :  {PackValue(product.Expiry, product.PrintExpiry)}";
+        PreviewBatch.Text = $"B.No :  {PackValue(product.Batch, product.PrintBatch)}";
+        PreviewNetWeight.Text = $"N.Wt :  {PackValue(product.NetWeight, product.PrintNetWeight)}";
+        PreviewMrp.Text = $"M.R.P. (Rs.)  {Dash(product.Mrp)}";
+        PreviewSugar.Text = $"{Dash(product.Sugar)} g/100g";
+        PreviewSalt.Text = $"{Dash(product.Salt)} g/100g";
+        PreviewFat.Text = $"{Dash(product.Fat)} g/100g";
+    }
+
+    private static string PackValue(string value, bool printedOnPack) => printedOnPack ? "Printed on Pack" : Dash(value);
+    private static string Dash(string value) => string.IsNullOrWhiteSpace(value) ? "—" : value;
+    private static int ParsePositiveInt(string? value, int fallback) =>
+        int.TryParse(value, out var parsed) && parsed > 0 ? parsed : fallback;
+    private static string GetDatabasePath() => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "Razeen Secure Solution", "RSS Label Maker", "rss-label-maker.db");
+
+    private static void InitializeProductDatabase()
+    {
+        var path = GetDatabasePath();
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        using var connection = new SqliteConnection($"Data Source={path}");
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            CREATE TABLE IF NOT EXISTS Products (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                English TEXT NOT NULL, Sinhala TEXT NOT NULL DEFAULT '', Tamil TEXT NOT NULL DEFAULT '',
+                Mfd TEXT NOT NULL DEFAULT '', Expiry TEXT NOT NULL DEFAULT '', Batch TEXT NOT NULL DEFAULT '',
+                NetWeight TEXT NOT NULL DEFAULT '', Sugar TEXT NOT NULL DEFAULT '', Salt TEXT NOT NULL DEFAULT '',
+                Fat TEXT NOT NULL DEFAULT '', Mrp TEXT NOT NULL DEFAULT '', Importer TEXT NOT NULL DEFAULT '',
+                Copies INTEGER NOT NULL DEFAULT 1, PrintMfd INTEGER NOT NULL DEFAULT 0,
+                PrintExpiry INTEGER NOT NULL DEFAULT 0, PrintBatch INTEGER NOT NULL DEFAULT 0,
+                PrintNetWeight INTEGER NOT NULL DEFAULT 0, CreatedUtc TEXT NOT NULL
+            );
+            """;
+        command.ExecuteNonQuery();
+    }
+
+    private void LoadProducts()
+    {
+        using var connection = new SqliteConnection($"Data Source={GetDatabasePath()}");
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT English, Sinhala, Tamil, Mfd, Expiry, Batch, NetWeight, Sugar, Salt, Fat, Mrp, Importer, Copies,
+                   PrintMfd, PrintExpiry, PrintBatch, PrintNetWeight FROM Products ORDER BY Id DESC;
+            """;
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+            _products.Add(new ProductRow
+            {
+                English = reader.GetString(0), Sinhala = reader.GetString(1), Tamil = reader.GetString(2),
+                Mfd = reader.GetString(3), Expiry = reader.GetString(4), Batch = reader.GetString(5),
+                NetWeight = reader.GetString(6), Sugar = reader.GetString(7), Salt = reader.GetString(8),
+                Fat = reader.GetString(9), Mrp = reader.GetString(10), Importer = reader.GetString(11),
+                Copies = reader.GetInt32(12), PrintMfd = reader.GetInt32(13) == 1,
+                PrintExpiry = reader.GetInt32(14) == 1, PrintBatch = reader.GetInt32(15) == 1,
+                PrintNetWeight = reader.GetInt32(16) == 1
+            });
         ProductCount.Text = _products.Count.ToString();
-        ProductStatus.Text = "Added to the current session. Local database persistence is part of the next milestone.";
-        PreviewEnglish.Text = EnglishName.Text.Trim().ToUpperInvariant();
-        PreviewLocal.Text = $"{SinhalaName.Text.Trim()}  •  {TamilName.Text.Trim()}".Trim(' ', '•');
+        if (_products.Count > 0) UpdateLabelPreview(_products[0]);
     }
 
     private void ApplyLayout_Click(object sender, RoutedEventArgs e)
     {
-        LayoutStatus.Text = "Dimension controls are shown in the prototype shell. Validated layout calculation and printer-area checks are next.";
+        if (!double.TryParse(LabelWidthInput.Text, NumberStyles.Number, CultureInfo.InvariantCulture, out var width) ||
+            !double.TryParse(LabelHeightInput.Text, NumberStyles.Number, CultureInfo.InvariantCulture, out var height) ||
+            width <= 0 || height <= 0)
+        {
+            LayoutStatus.Text = "Enter positive label width and height in millimetres.";
+            return;
+        }
+        var (paperWidth, paperHeight) = LabelPaperSize.SelectedIndex switch
+        {
+            1 => (148d, 210d), 2 => (215.9d, 279.4d), _ => (210d, 297d)
+        };
+        const double margin = 5d, gap = 3d;
+        var columns = (int)Math.Floor((paperWidth - 2 * margin + gap) / (width + gap));
+        var rows = (int)Math.Floor((paperHeight - 2 * margin + gap) / (height + gap));
+        if (columns < 1 || rows < 1)
+        {
+            LayoutStatus.Text = $"A {width:0.##} × {height:0.##} mm label does not fit this sheet with 5 mm margins and 3 mm gaps.";
+            return;
+        }
+        LayoutStatus.Text = $"{LabelPaperSize.Text} · {columns} columns × {rows} rows · {columns * rows} labels/sheet. Geometry only; printer hardware margins are not yet checked.";
     }
 
     private void RefreshPrinters_Click(object sender, RoutedEventArgs e) => RefreshPrinters();
@@ -553,7 +679,19 @@ public partial class MainWindow : Window
         public string English { get; init; } = "";
         public string Sinhala { get; init; } = "";
         public string Tamil { get; init; } = "";
+        public string Mfd { get; init; } = "";
+        public string Expiry { get; init; } = "";
         public string Batch { get; init; } = "";
+        public string NetWeight { get; init; } = "";
+        public string Sugar { get; init; } = "";
+        public string Salt { get; init; } = "";
+        public string Fat { get; init; } = "";
         public string Mrp { get; init; } = "";
+        public string Importer { get; init; } = "";
+        public int Copies { get; init; } = 1;
+        public bool PrintMfd { get; init; }
+        public bool PrintExpiry { get; init; }
+        public bool PrintBatch { get; init; }
+        public bool PrintNetWeight { get; init; }
     }
 }
