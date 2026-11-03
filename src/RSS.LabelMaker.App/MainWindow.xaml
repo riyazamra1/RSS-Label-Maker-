@@ -120,7 +120,7 @@
          </Grid>
          <StackPanel x:Name="PerPiecePricePanel" Visibility="Collapsed" Margin="0,8,0,0">
           <TextBlock Text="Calculation mode" FontSize="11"/>
-          <ComboBox x:Name="PerPiecePricingMode" SelectedIndex="0" SelectionChanged="PerPiecePricing_Changed" Margin="0,4,0,6">
+          <ComboBox x:Name="PerPiecePricingMode" SelectedIndex="0" SelectionChanged="PerPiecePricingMode_Changed" Margin="0,4,0,6">
            <ComboBoxItem Content="Automatic — Box Price ÷ Pieces per Box"/>
            <ComboBoxItem Content="Manual — enter per-piece price"/>
           </ComboBox>
