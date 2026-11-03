@@ -140,6 +140,14 @@
        <TextBlock Text="Layout" FontSize="11"/><ComboBox SelectedIndex="0" Margin="0,5,0,12"><ComboBoxItem Content="Automatic rows &amp; columns"/><ComboBoxItem Content="Manual rows &amp; columns"/></ComboBox>
        <Button Content="Apply dimensions" Click="ApplyLayout_Click" Background="#C69A43" Margin="0,8,0,0"/>
        <TextBlock x:Name="LayoutStatus" Text="A4 sheet · Actual size preview" Foreground="#77808C" FontSize="10" TextWrapping="Wrap" Margin="0,12,0,0"/>
+       <Border Height="1" Background="#E6E8EB" Margin="0,16,0,12"/>
+       <TextBlock Text="LOGO WATERMARK" FontWeight="Bold" FontSize="11" Foreground="#77808C" Margin="0,0,0,8"/>
+       <Button Content="Choose logo image…" Click="ChooseWatermark_Click" HorizontalAlignment="Stretch"/>
+       <TextBlock x:Name="WatermarkFileName" Text="No logo selected" Foreground="#77808C" FontSize="10" TextWrapping="Wrap" Margin="0,7,0,8"/>
+       <TextBlock Text="Watermark opacity" FontSize="11"/>
+       <Slider x:Name="WatermarkOpacitySlider" Minimum="0" Maximum="1" Value="0.20" TickFrequency="0.05" IsSnapToTickEnabled="False" ValueChanged="WatermarkOpacity_ValueChanged" Margin="0,6,0,0"/>
+       <TextBlock x:Name="WatermarkOpacityValue" Text="20%" Foreground="#77808C" FontSize="10" HorizontalAlignment="Right"/>
+       <Button Content="Remove watermark" Click="RemoveWatermark_Click" HorizontalAlignment="Stretch" Margin="0,8,0,0"/>
       </StackPanel>
      </Border>
      <Border Grid.Column="1" Background="#E9EBEE" CornerRadius="8" Padding="24">
@@ -147,6 +155,7 @@
        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top"><TextBlock Text="DESIGN CANVAS" FontWeight="Bold" FontSize="11" Foreground="#77808C"/><TextBlock Text="   ·   100%" FontSize="11" Foreground="#77808C"/></StackPanel>
        <Border x:Name="PreviewLabelBorder" Width="490" Height="315" Background="White" BorderBrush="#20242B" BorderThickness="1.2" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="14">
         <Grid>
+         <Image x:Name="PreviewWatermark" Grid.RowSpan="5" Source="{x:Null}" Stretch="Uniform" Opacity="0.20" Visibility="Collapsed" IsHitTestVisible="False"/>
          <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
          <TextBlock x:Name="PreviewEnglish" Text="PRODUCT NAME" Foreground="#C83232" FontSize="23" FontWeight="Bold" HorizontalAlignment="Center"/>
          <TextBlock x:Name="PreviewLocal" Grid.Row="1" Text="සිංහල නම  •  தமிழ் பெயர்" Foreground="#C83232" FontSize="14" HorizontalAlignment="Center" Margin="0,1,0,8"/>
