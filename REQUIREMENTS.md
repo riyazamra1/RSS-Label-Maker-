@@ -266,6 +266,17 @@ Requirements:
 - Installer and application must support the declared Windows 10/11 target; validate actual OS/runtime requirements during build.
 - Free standalone use; no licensing server, forced sign-in, subscription or RSS Core connection.
 
+## Logo watermark
+
+- The label designer must allow the user to browse for and load a logo/image file as a watermark on the label.
+- Support common image formats used for logos: PNG, JPG/JPEG, BMP, GIF and TIFF.
+- Provide a continuously adjustable opacity control from 0% (fully transparent) to 100% (fully opaque), with the selected percentage displayed.
+- Show the watermark in the live label preview behind the label text and nutrition panels so it does not obscure product information.
+- Provide a remove/clear watermark action.
+- Persist the selected image asset/reference and opacity with each saved label template; do not rely on a temporary file path that may later disappear.
+- Apply the same watermark, positioning, sizing and opacity in preview, PDF/export and physical printer output.
+- Validate missing or unsupported image files gracefully and never crash the designer when an image cannot be loaded.
+
 ## 16. Testing and acceptance criteria
 
 1. Create and edit a product with English, Sinhala and Tamil names.
