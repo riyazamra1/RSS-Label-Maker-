@@ -19,12 +19,57 @@ The reference is a layout guide, not a fixed-size template. Users must be able t
 - Native Windows desktop application; not a WebView wrapper.
 - C# / .NET 10 LTS / WPF.
 - SQLite local database.
-- Free standalone licensing; no account, subscription, activation or RSS Core requirement.
+- Free software; mandatory account registration and email verification before first use. No subscription, paid activation or RSS Core dependency.
 - Any printer installed and usable through the Windows printing subsystem.
-- Normal product management, design, preview and printing must work offline.
+- Normal product management, design, preview and printing must work offline after the device has completed first-time online email verification.
 - Online translation is used only to generate Sinhala and Tamil product-name suggestions from an English product name. Translation results are cached locally.
 - No automatic translation of any other field.
 - No deployment requirement; deliver a Windows installer after validation.
+
+## 2A. Account registration, email verification and offline access — mandatory
+
+### First-run access gate
+- On first launch, show a dedicated RSS Label Maker account screen. The user must register and verify the email address before entering the main application.
+- Registration fields: full name, email address, password and password confirmation. Validate required fields, email syntax and password policy before sending.
+- Registration creates a pending account; it must not grant application access until the email address is verified.
+- Send a short-lived, single-use email verification code through the server-side Resend integration. Never put the Resend API key or other backend secrets in the desktop executable.
+- Verification screen accepts the code, supports resend with cooldown, shows expiry/errors clearly and prevents brute-force guessing with server-side attempt limits and rate limits.
+- After successful verification, issue a device session and persist the verified-device credential securely using Windows DPAPI / Windows Credential Manager. Do not store plaintext passwords or reusable bearer tokens in SQLite, logs or ordinary settings files.
+- On subsequent launches, restore the remembered verified-device state without forcing registration again. Provide explicit Sign in, Sign out and Forgot password flows.
+- Password reset must use a time-limited, single-use email code or secure reset link; changing a password revokes other active sessions.
+- Sign out removes local device credentials and local offline trust. The user must authenticate again to access the application.
+- Do not expose whether an email is registered in public responses; use generic account recovery and registration responses where appropriate.
+
+### Offline operation and account state
+- Internet is required for initial registration, email verification, first device authorization, sign-in and password recovery.
+- After successful verification, the authorized PC must be able to use product management, saved templates, label design, preview, and printing while offline.
+- Keep a locally protected verified-device credential / offline authorization record. Validate it locally at startup; synchronize revocation and account status whenever connectivity returns.
+- Explain the security boundary: an offline PC cannot learn about a server-side account suspension or remote revocation until it reconnects. Do not claim instant offline revocation.
+- Authentication outages must not corrupt or block access to already-authorized offline work. A new/unverified device must remain blocked until verification succeeds.
+- Authentication service must never store or receive product records, label content, watermark images, or print jobs.
+
+### Authentication service architecture
+- Separate Cloudflare Worker service with D1 for account, verification, device-session and password-reset metadata.
+- Resend transactional email API called only from the Worker using a server-side secret. Use an authenticated sender domain configured and verified in Resend before production email delivery.
+- Keep this service independent from RSS Core and from the local SQLite database.
+- Define versioned API contracts and migrations. Minimum operations: register, verify email code, resend verification, sign in, refresh/check device session, sign out/revoke device, request password reset, complete password reset, and health.
+- Store passwords using a modern salted, deliberately expensive password-hashing scheme supported by the Worker runtime; use constant-time comparisons for secret/code verification. Never store plaintext passwords or verification codes.
+- Verification codes: cryptographically random, short expiry, one-time use, bounded attempts, resend cooldown, and server-side rate limits for IP/email/device. Hash codes at rest.
+- Use HTTPS only, strict input validation, generic auth errors, safe CORS policy, request-size limits, structured security logging without passwords/codes/tokens, and protection against enumeration, replay and brute-force attempts.
+- Keep API base URL configurable for development and production; do not hardcode an unverified domain or deploy automatically.
+- Document required Cloudflare resources, D1 migrations, Worker secrets, Resend sender-domain setup and Windows client configuration.
+
+### Registration acceptance criteria
+1. A fresh installation cannot open the main app before successful registration and email verification.
+2. A pending/unverified account cannot enter the app even if it restarts.
+3. Correct unexpired verification code activates the account; expired, reused or incorrect codes are rejected.
+4. Resend cooldown and attempt/rate limits are enforced server-side.
+5. A verified device is remembered securely and can launch offline to use local products, templates, design and printing.
+6. Sign out clears local trust; a later launch requires sign-in and online authorization.
+7. Password reset works through email and invalidates prior sessions as specified.
+8. Auth service outage does not prevent an already-authorized device from accessing local offline work.
+9. No product/label data or secrets are transmitted to the authentication service or embedded in the desktop binary.
+10. Worker/API tests cover registration, verification, expiration, replay, throttling, password hashing, session lifecycle and recovery.
 
 ## 3. Product information model
 
@@ -243,7 +288,7 @@ Requirements:
 - Transaction-safe writes.
 - Backup and restore.
 - Safe migration/backup strategy.
-- No mandatory cloud database or user account.
+- A small online authentication service is required only for registration, email verification, sign-in, password recovery and account/session administration. Product, label, template and print data remain local in SQLite; no product data is uploaded for authentication.
 
 ## 14. UX and branding
 
@@ -257,14 +302,14 @@ Requirements:
 
 ## 15. Non-functional requirements
 
-- Product creation, editing, design, preview and printing work without internet.
+- After initial device verification, product creation, editing, design, preview and printing work without internet.
 - Translation is the only core workflow requiring internet.
 - Avoid data loss; autosave drafts or provide clear save state.
 - No silent text clipping, label overlap or page scaling.
 - Stable operation with large product lists and bulk jobs.
 - Logging for diagnostics without recording translation credentials or sensitive secrets.
 - Installer and application must support the declared Windows 10/11 target; validate actual OS/runtime requirements during build.
-- Free standalone use; no licensing server, forced sign-in, subscription or RSS Core connection.
+- Free use with mandatory email-verified account registration; no subscription, paid activation or RSS Core connection. Online authentication is required for first-time verification and account recovery, not for normal offline label work on an already-authorized PC.
 
 ## Logo watermark
 
@@ -308,7 +353,7 @@ M4 — Custom dimensions, A4 layout engine and preview.
 M5 — Designer editing tools and barcode/QR.  
 M6 — Windows printing, calibration and PDF.  
 M7 — Excel/CSV bulk import.  
-M8 — QA, installer, documentation and release.
+M8 — Account registration, email verification, secure device authorization and offline session handling.\nM9 — QA, installer, documentation and release.
 
 Do not mark a milestone complete without code, build/test evidence and functional verification. Do not deploy web services; this is a Windows desktop application.
 
@@ -320,4 +365,4 @@ Do not mark a milestone complete without code, build/test evidence and functiona
 - Present a change summary before each commit.
 - Do not commit blindly.
 - Do not claim build, printer or translation verification without actual test evidence.
-- No deployment without explicit user approval.
+- No deployment without explicit user approval. User approval to implement authentication does not itself authorize production deployment or DNS changes.
