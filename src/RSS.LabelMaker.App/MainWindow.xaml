@@ -89,7 +89,7 @@
        <TextBlock Text="PRODUCT DETAILS" FontSize="11" FontWeight="Bold" Foreground="#77808C" Margin="0,0,0,12"/>
        <Grid>
         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-        <StackPanel Grid.Column="0" Margin="0,0,12,0"><TextBlock Text="Product name (English)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="EnglishName" TextChanged="ProductField_TextChanged"/></StackPanel>
+        <StackPanel Grid.Column="0" Margin="0,0,12,0"><TextBlock Text="Product name (English) — select existing or type new" FontSize="11" Margin="0,0,0,5"/><ComboBox x:Name="EnglishName" IsEditable="True" IsTextSearchEnabled="False" StaysOpenOnEdit="True" DisplayMemberPath="English" SelectionChanged="ProductName_SelectionChanged" KeyUp="ProductName_KeyUp" LostKeyboardFocus="ProductName_LostKeyboardFocus" ToolTip="Choose a saved product or type a new product name"/></StackPanel>
         <StackPanel Grid.Column="1" Margin="0,0,12,0"><TextBlock Text="Product name (Sinhala)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="SinhalaName" TextChanged="ProductField_TextChanged"/></StackPanel>
         <StackPanel Grid.Column="2"><TextBlock Text="Product name (Tamil)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="TamilName" TextChanged="ProductField_TextChanged"/></StackPanel>
        </Grid>
