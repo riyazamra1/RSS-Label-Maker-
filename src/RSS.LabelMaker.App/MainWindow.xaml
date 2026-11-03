@@ -279,7 +279,7 @@
         <StackPanel Grid.Column="1" Margin="6,0,0,0"><TextBlock Text="Vertical" FontSize="10"/><TextBox x:Name="VerticalLabelGap" Text="2" TextChanged="PrintCapacityInputs_Changed"/></StackPanel>
        </Grid>
        <TextBlock Text="ITEMS ON THIS SHEET" FontSize="11" FontWeight="Bold" Margin="0,14,0,5"/>
-       <CheckBox x:Name="EnableMultipleLabels" Content="Enable Multiple Labels (different products on one sheet)" IsChecked="True" Checked="PrintCapacityInputs_Changed" Unchecked="PrintCapacityInputs_Changed" FontSize="11" Margin="0,0,0,7"/>
+       <CheckBox x:Name="EnableMultipleLabels" Content="Enable Multiple Labels (different products on one sheet)" IsChecked="False" Checked="PrintCapacityInputs_Changed" Unchecked="PrintCapacityInputs_Changed" FontSize="11" Margin="0,0,0,7"/>
        <TextBlock Text="Tick every product to include it. Copies are taken from each product's Copies field." FontSize="10" Foreground="#77808C" TextWrapping="Wrap" Margin="0,0,0,6"/>
        <ListBox x:Name="PrintProductsList" ItemsSource="{Binding}" MaxHeight="190" BorderBrush="#E6E8EB">
         <ListBox.ItemTemplate>
