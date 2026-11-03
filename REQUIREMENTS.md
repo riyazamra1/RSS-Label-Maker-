@@ -21,7 +21,7 @@ The reference is a layout guide, not a fixed-size template. Users must be able t
 - SQLite local database.
 - Mandatory account registration and email verification through RSS Core before first use.
 - RSS Core is the central user database, identity provider, license authority and subscription/entitlement authority. Do not create a separate RSS Label Maker user database or standalone authentication backend.
-- Free tier is available after registration and is subject to configurable daily label-print limits and feature restrictions. Paid plans are activated by redeeming a license key issued/validated by RSS Core.
+- Free tier is available after registration and permits **20 printed labels per RSS Core account per calendar day**, shared across all activated PCs and shared users, subject to the Free feature restrictions. Paid plans are activated by redeeming a license key issued/validated by RSS Core.
 - License entitlements govern device count, shared-user seats, feature access, daily usage limits, cloud backup and restore.
 - Any printer installed and usable through the Windows printing subsystem.
 - Local label work is stored in SQLite. Offline access is governed by a cached, signed, time-bounded RSS Core entitlement; usage limits and revocations must reconcile with RSS Core when online.
@@ -48,7 +48,8 @@ The reference is a layout guide, not a fixed-size template. Users must be able t
 - Show plan name, license status, expiry/valid-through date, active devices, available device slots, shared-user seats and current day's usage in the app.
 
 ### Free tier restrictions
-- Free users have a configurable maximum number of labels printed per account per day. Count successful label output, not preview actions; define duplicate/copy handling consistently in the RSS Core usage policy.
+- Free users may print a maximum of **20 labels per RSS Core account per calendar day**. The quota is shared across every activated PC and all shared users belonging to that account; it is not a per-device or per-user allowance.
+- Count each label copy in a successfully submitted print job individually. Preview actions do not count. Cancelled jobs and jobs that fail before the Windows print spooler accepts them do not count. Use an idempotent print-job identifier so retries cannot double-charge. The client must explain that spooler acceptance confirms submission, not that paper physically emerged from the printer.
 - PDF export is disabled for Free.
 - Saving reusable Import By / Distributed By master profiles is disabled for Free. Product-specific importer/distributor text may be entered for an individual product only if the final plan policy permits it.
 - Additional feature restrictions must be controlled by server-provided feature flags, not hard-coded assumptions. The plan matrix must be finalized before release.
@@ -101,7 +102,7 @@ The reference is a layout guide, not a fixed-size template. Users must be able t
 ### Acceptance criteria
 1. New users register and verify through RSS Core; user details appear in the RSS Core user database.
 2. No separate Label Maker account database or standalone auth Worker/D1 is used.
-3. Free plan is automatically assigned and its daily print quota is enforced.
+3. Free plan is automatically assigned and its limit of 20 printed labels per account per calendar day is enforced across all PCs and shared users.
 4. Free plan cannot export PDF or save reusable Import By / Distributed By master profiles.
 5. License key entry calls RSS Core and activates only a valid, eligible entitlement.
 6. Single-PC and multi-PC activation limits are enforced by RSS Core using stable device IDs.
