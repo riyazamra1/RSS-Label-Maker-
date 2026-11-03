@@ -217,7 +217,6 @@ public partial class MainWindow : Window
         EnglishName.Focus();
     }
 
-    private void ProductName_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) => UpdatePreview();
 
     private void ClearProductDetails()
     {
