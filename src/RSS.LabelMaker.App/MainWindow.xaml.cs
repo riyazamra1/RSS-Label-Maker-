@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Printing;
 using System.Windows;
 using System.Windows.Controls;
@@ -79,19 +80,94 @@ public partial class MainWindow : Window
             English = EnglishName.Text.Trim(),
             Sinhala = SinhalaName.Text.Trim(),
             Tamil = TamilName.Text.Trim(),
+            Mfd = Mfd.Text.Trim(),
+            Expiry = Expiry.Text.Trim(),
             Batch = Batch.Text.Trim(),
+            NetWeight = NetWeight.Text.Trim(),
+            MfdPrintOnPack = MfdPrintOnPack.IsChecked == true,
+            ExpiryPrintOnPack = ExpiryPrintOnPack.IsChecked == true,
+            BatchPrintOnPack = BatchPrintOnPack.IsChecked == true,
+            NetWeightPrintOnPack = NetWeightPrintOnPack.IsChecked == true,
+            Sugar = Sugar.Text.Trim(),
+            Salt = Salt.Text.Trim(),
+            Fat = Fat.Text.Trim(),
             Mrp = Mrp.Text.Trim()
         });
         ProductCount.Text = _products.Count.ToString();
-        ProductStatus.Text = "Added to the current session. Local database persistence is part of the next milestone.";
-        PreviewEnglish.Text = EnglishName.Text.Trim().ToUpperInvariant();
-        PreviewLocal.Text = $"{SinhalaName.Text.Trim()}  •  {TamilName.Text.Trim()}".Trim(' ', '•');
+        ProductStatus.Text = "Added to the current session. Local database persistence is not implemented yet.";
+        UpdatePreview();
     }
 
     private void ApplyLayout_Click(object sender, RoutedEventArgs e)
     {
-        LayoutStatus.Text = "Dimension controls are shown in the prototype shell. Validated layout calculation and printer-area checks are next.";
+        if (!TryReadMillimetres(LabelWidth.Text, out var labelWidth) ||
+            !TryReadMillimetres(LabelHeight.Text, out var labelHeight) ||
+            labelWidth <= 0 || labelHeight <= 0)
+        {
+            LayoutStatus.Text = "Enter valid positive label width and height in millimetres.";
+            return;
+        }
+
+        var (paperWidth, paperHeight, paperName) = DesignerPaperSize.SelectedIndex switch
+        {
+            1 => (148m, 210m, "A5"),
+            2 => (215.9m, 279.4m, "Letter"),
+            _ => (210m, 297m, "A4")
+        };
+
+        var columns = (int)Math.Floor(paperWidth / labelWidth);
+        var rows = (int)Math.Floor(paperHeight / labelHeight);
+        var count = Math.Max(0, columns) * Math.Max(0, rows);
+
+        if (columns < 1 || rows < 1)
+        {
+            LayoutStatus.Text = $"A {labelWidth:0.##} × {labelHeight:0.##} mm label does not fit on nominal {paperName} paper.";
+            return;
+        }
+
+        var scale = Math.Min(7d, Math.Min(490d / (double)labelWidth, 315d / (double)labelHeight));
+        PreviewLabelBorder.Width = (double)labelWidth * scale;
+        PreviewLabelBorder.Height = (double)labelHeight * scale;
+        LayoutStatus.Text = $"{paperName}: {columns} column(s) × {rows} row(s) = {count} label(s) per sheet. Nominal-paper estimate only; printer margins and gaps are not included.";
     }
+
+    private static bool TryReadMillimetres(string value, out decimal result) =>
+        decimal.TryParse(value, NumberStyles.Number, CultureInfo.CurrentCulture, out result) ||
+        decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out result);
+
+    private void ProductField_TextChanged(object sender, TextChangedEventArgs e) => UpdatePreview();
+
+    private void PrintOnPack_Changed(object sender, RoutedEventArgs e) => UpdatePreview();
+
+    private void UpdatePreview()
+    {
+        if (PreviewEnglish is null || EnglishName is null)
+            return;
+
+        PreviewEnglish.Text = string.IsNullOrWhiteSpace(EnglishName.Text)
+            ? "PRODUCT NAME"
+            : EnglishName.Text.Trim().ToUpperInvariant();
+        PreviewLocal.Text = $"{SinhalaName.Text.Trim()}  •  {TamilName.Text.Trim()}".Trim(' ', '•');
+        PreviewMfd.Text = FormatPreviewRow("M.F.D", Mfd.Text, MfdPrintOnPack.IsChecked == true);
+        PreviewExpiry.Text = FormatPreviewRow("EXP.D", Expiry.Text, ExpiryPrintOnPack.IsChecked == true);
+        PreviewBatch.Text = FormatPreviewRow("B.No", Batch.Text, BatchPrintOnPack.IsChecked == true);
+        PreviewNetWeight.Text = FormatPreviewRow("N.Wt", NetWeight.Text, NetWeightPrintOnPack.IsChecked == true);
+        PreviewMrp.Text = $"M.R.P. (Rs.)  {(string.IsNullOrWhiteSpace(Mrp.Text) ? "—" : Mrp.Text.Trim())}";
+        PreviewSugar.Text = $"{DisplayNutrition(Sugar.Text)} g/100g";
+        PreviewSalt.Text = $"{DisplayNutrition(Salt.Text)} g/100g";
+        PreviewFat.Text = $"{DisplayNutrition(Fat.Text)} g/100g";
+    }
+
+    private static string FormatPreviewRow(string label, string value, bool printOnPack)
+    {
+        var display = printOnPack
+            ? "Printed on Pack"
+            : string.IsNullOrWhiteSpace(value) ? "—" : value.Trim();
+        return $"{label} :  {display}";
+    }
+
+    private static string DisplayNutrition(string value) =>
+        string.IsNullOrWhiteSpace(value) ? "—" : value.Trim();
 
     private void RefreshPrinters_Click(object sender, RoutedEventArgs e) => RefreshPrinters();
 
@@ -125,7 +201,17 @@ public partial class MainWindow : Window
         public string English { get; init; } = "";
         public string Sinhala { get; init; } = "";
         public string Tamil { get; init; } = "";
+        public string Mfd { get; init; } = "";
+        public string Expiry { get; init; } = "";
         public string Batch { get; init; } = "";
+        public string NetWeight { get; init; } = "";
+        public bool MfdPrintOnPack { get; init; }
+        public bool ExpiryPrintOnPack { get; init; }
+        public bool BatchPrintOnPack { get; init; }
+        public bool NetWeightPrintOnPack { get; init; }
+        public string Sugar { get; init; } = "";
+        public string Salt { get; init; } = "";
+        public string Fat { get; init; } = "";
         public string Mrp { get; init; } = "";
     }
 }
