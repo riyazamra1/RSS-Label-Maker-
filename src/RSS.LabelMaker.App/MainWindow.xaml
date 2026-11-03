@@ -369,7 +369,7 @@
     </Grid>
     <!-- Import and settings placeholder pages -->
     <Grid x:Name="ImportPage" Visibility="Collapsed"><Border Background="White" CornerRadius="8" Padding="28"><StackPanel><TextBlock Text="IMPORT / EXPORT" FontSize="18" FontWeight="Bold"/><TextBlock Text="Excel and CSV field mapping, validation preview and PDF export are planned for the next implementation stages." Foreground="#77808C" Margin="0,10,0,0"/></StackPanel></Border></Grid>
-    <Grid x:Name="SettingsPage" Visibility="Collapsed"><Border Background="White" CornerRadius="8" Padding="28"><StackPanel><TextBlock Text="APPLICATION SETTINGS" FontSize="18" FontWeight="Bold"/><TextBlock Text="Local data location, appearance, translation provider and backup settings will be configured here." Foreground="#77808C" Margin="0,10,0,0"/></StackPanel></Border></Grid>
+    <Grid x:Name="SettingsPage" Visibility="Collapsed"><Border Background="White" CornerRadius="8" Padding="28"><StackPanel><TextBlock Text="APPLICATION SETTINGS" FontSize="18" FontWeight="Bold"/><TextBlock Text="Local data location, appearance, translation provider and backup settings will be configured here." Foreground="#77808C" Margin="0,10,0,0"/><Border Height="1" Background="#E6E8EB" Margin="0,22,0,18"/><TextBlock Text="ACCOUNT" FontWeight="Bold" FontSize="12"/><TextBlock Text="This PC uses a protected, verified device session. Signing out removes this PC’s offline access." Foreground="#77808C" TextWrapping="Wrap" Margin="0,8,0,12"/><Button Content="Sign out" Width="120" HorizontalAlignment="Left" Background="#A33B32" Foreground="White" Click="SignOut_Click"/></StackPanel></Border></Grid>
    </Grid>
   </Grid>
  </Grid>
