@@ -733,13 +733,13 @@ public partial class MainWindow : Window
             PrintStatus.Text = "Set valid label dimensions in the Designer first.";
             return;
         }
-        if (!TryGetPrintPageSettings(out var pageWidthMm, out var pageHeightMm, out var marginMm, out var gapMm, out var orientation))
+        if (!TryGetPrintPageSettings(out var pageWidthMm, out var pageHeightMm, out var marginLeftMm, out var marginTopMm, out var marginRightMm, out var marginBottomMm, out var horizontalGapMm, out var verticalGapMm, out var orientation))
             return;
 
         var copies = int.TryParse(product.Copies, NumberStyles.None, CultureInfo.CurrentCulture, out var parsedCopies)
             ? Math.Clamp(parsedCopies, 1, 500) : 1;
-        var columns = (int)Math.Floor((pageWidthMm - 2 * marginMm + gapMm) / (labelWidthMm + gapMm));
-        var rows = (int)Math.Floor((pageHeightMm - 2 * marginMm + gapMm) / (labelHeightMm + gapMm));
+        var columns = (int)Math.Floor((pageWidthMm - marginLeftMm - marginRightMm + horizontalGapMm) / (labelWidthMm + horizontalGapMm));
+        var rows = (int)Math.Floor((pageHeightMm - marginTopMm - marginBottomMm + verticalGapMm) / (labelHeightMm + verticalGapMm));
         if (columns < 1 || rows < 1)
         {
             PrintStatus.Text = "The selected label does not fit inside the page margins. Reduce the label size or margins.";
@@ -750,7 +750,7 @@ public partial class MainWindow : Window
         var pages = new List<DrawingVisual>();
         for (var page = 0; page < pageCount; page++)
             pages.Add(BuildSheetVisual(product, pageWidthMm, pageHeightMm, labelWidthMm, labelHeightMm,
-                marginMm, gapMm, Math.Min(perPage, copies - page * perPage), columns));
+                marginLeftMm, marginTopMm, horizontalGapMm, verticalGapMm, Math.Min(perPage, copies - page * perPage), columns));
 
         var preview = new PrintPreviewWindow(pages, pageWidthMm, pageHeightMm, copies, perPage, () => PrintSheetVisuals(pages, pageWidthMm, pageHeightMm, orientation, PrinterList.SelectedItem?.ToString()));
         preview.Owner = this;
@@ -759,9 +759,9 @@ public partial class MainWindow : Window
         PrintStatus.Text = "Preview is ready. Check page alignment before printing.";
     }
 
-    private bool TryGetPrintPageSettings(out decimal pageWidthMm, out decimal pageHeightMm, out decimal marginMm, out decimal gapMm, out PageOrientation orientation)
+    private bool TryGetPrintPageSettings(out decimal pageWidthMm, out decimal pageHeightMm, out decimal marginLeftMm, out decimal marginTopMm, out decimal marginRightMm, out decimal marginBottomMm, out decimal horizontalGapMm, out decimal verticalGapMm, out PageOrientation orientation)
     {
-        pageWidthMm = 210m; pageHeightMm = 297m; marginMm = 8m; gapMm = 2m; orientation = PageOrientation.Portrait;
+        pageWidthMm = 210m; pageHeightMm = 297m; marginLeftMm = 8m; marginTopMm = 8m; marginRightMm = 8m; marginBottomMm = 8m; horizontalGapMm = 2m; verticalGapMm = 2m; orientation = PageOrientation.Portrait;
         var selected = PrintPaperSize.SelectedItem is ComboBoxItem item ? item.Content?.ToString() : "A4";
         switch (selected)
         {
@@ -782,26 +782,33 @@ public partial class MainWindow : Window
             (pageWidthMm, pageHeightMm) = (pageHeightMm, pageWidthMm);
             orientation = PageOrientation.Landscape;
         }
-        if (!TryReadMillimetres(PageMargin.Text, out marginMm) || marginMm < 0m ||
-            !TryReadMillimetres(LabelGap.Text, out gapMm) || gapMm < 0m ||
-            marginMm * 2 >= Math.Min(pageWidthMm, pageHeightMm))
+        if (!TryReadMillimetres(MarginLeft.Text, out marginLeftMm) || marginLeftMm < 0m ||
+            !TryReadMillimetres(MarginTop.Text, out marginTopMm) || marginTopMm < 0m ||
+            !TryReadMillimetres(MarginRight.Text, out marginRightMm) || marginRightMm < 0m ||
+            !TryReadMillimetres(MarginBottom.Text, out marginBottomMm) || marginBottomMm < 0m ||
+            !TryReadMillimetres(HorizontalLabelGap.Text, out horizontalGapMm) || horizontalGapMm < 0m ||
+            !TryReadMillimetres(VerticalLabelGap.Text, out verticalGapMm) || verticalGapMm < 0m ||
+            marginLeftMm + marginRightMm >= pageWidthMm || marginTopMm + marginBottomMm >= pageHeightMm)
         {
-            PrintStatus.Text = "Enter a valid non-negative page margin and label gap.";
+            PrintStatus.Text = "Enter valid non-negative margins and label gaps. Opposing margins must leave usable page space.";
             return false;
         }
         return true;
     }
 
     private DrawingVisual BuildSheetVisual(ProductRow product, decimal pageWidthMm, decimal pageHeightMm,
-        decimal labelWidthMm, decimal labelHeightMm, decimal marginMm, decimal gapMm, int labelCount, int columns)
+        decimal labelWidthMm, decimal labelHeightMm, decimal marginLeftMm, decimal marginTopMm,
+        decimal horizontalGapMm, decimal verticalGapMm, int labelCount, int columns)
     {
         const double mmToDip = 96d / 25.4d;
         var pageWidth = (double)pageWidthMm * mmToDip;
         var pageHeight = (double)pageHeightMm * mmToDip;
         var labelWidth = (double)labelWidthMm * mmToDip;
         var labelHeight = (double)labelHeightMm * mmToDip;
-        var margin = (double)marginMm * mmToDip;
-        var gap = (double)gapMm * mmToDip;
+        var marginLeft = (double)marginLeftMm * mmToDip;
+        var marginTop = (double)marginTopMm * mmToDip;
+        var horizontalGap = (double)horizontalGapMm * mmToDip;
+        var verticalGap = (double)verticalGapMm * mmToDip;
         var visual = new DrawingVisual();
         using var dc = visual.RenderOpen();
         dc.DrawRectangle(Brushes.White, null, new Rect(0, 0, pageWidth, pageHeight));
@@ -809,7 +816,7 @@ public partial class MainWindow : Window
         {
             var col = i % columns;
             var row = i / columns;
-            dc.PushTransform(new TranslateTransform(margin + col * (labelWidth + gap), margin + row * (labelHeight + gap)));
+            dc.PushTransform(new TranslateTransform(marginLeft + col * (labelWidth + horizontalGap), marginTop + row * (labelHeight + verticalGap)));
             DrawProductLabel(dc, product, labelWidth, labelHeight);
             dc.Pop();
         }
