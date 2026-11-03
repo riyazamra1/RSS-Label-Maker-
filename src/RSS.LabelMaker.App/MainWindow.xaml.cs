@@ -752,10 +752,11 @@ public partial class MainWindow : Window
             pages.Add(BuildSheetVisual(product, pageWidthMm, pageHeightMm, labelWidthMm, labelHeightMm,
                 marginMm, gapMm, Math.Min(perPage, copies - page * perPage), columns));
 
-        var preview = new PrintPreviewWindow(pages, pageWidthMm, pageHeightMm, copies, perPage, () => PrintSheetVisuals(pages, pageWidthMm, pageHeightMm, orientation));
+        var preview = new PrintPreviewWindow(pages, pageWidthMm, pageHeightMm, copies, perPage, () => PrintSheetVisuals(pages, pageWidthMm, pageHeightMm, orientation, PrinterList.SelectedItem?.ToString()));
         preview.Owner = this;
         preview.ShowDialog();
-        PrintStatus.Text = $"Print layout: {columns} columns × {rows} rows; {perPage} labels per page; {pageCount} page(s) for {copies} copies.";
+        PrintLayoutSummary.Text = $"{pageWidthMm:0.##} × {pageHeightMm:0.##} mm · {orientation}\n{columns} columns × {rows} rows\n{perPage} labels per page · {pageCount} page(s)\n{copies} total copies";
+        PrintStatus.Text = "Preview is ready. Check page alignment before printing.";
     }
 
     private bool TryGetPrintPageSettings(out decimal pageWidthMm, out decimal pageHeightMm, out decimal marginMm, out decimal gapMm, out PageOrientation orientation)
@@ -888,10 +889,12 @@ public partial class MainWindow : Window
         }
     }
 
-    private static void PrintSheetVisuals(IReadOnlyList<DrawingVisual> pages, decimal pageWidthMm, decimal pageHeightMm, PageOrientation orientation)
+    private static void PrintSheetVisuals(IReadOnlyList<DrawingVisual> pages, decimal pageWidthMm, decimal pageHeightMm, PageOrientation orientation, string? selectedPrinter)
     {
         using var server = new LocalPrintServer();
         var dialog = new PrintDialog();
+        if (!string.IsNullOrWhiteSpace(selectedPrinter))
+            dialog.PrintQueue = server.GetPrintQueue(selectedPrinter);
         if (dialog.ShowDialog() != true) return;
         const double mmToDip = 96d / 25.4d;
         dialog.PrintTicket.PageMediaSize = new PageMediaSize((double)pageWidthMm * mmToDip, (double)pageHeightMm * mmToDip);
