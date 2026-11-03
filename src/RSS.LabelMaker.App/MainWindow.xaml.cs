@@ -34,6 +34,8 @@ public partial class MainWindow : Window
     private ComboBox? _timeZone;
     private TextBox? _minimumFontSize;
     private TextBox? _maximumFontSize;
+    private CheckBox? _automaticUpdates;
+    private TextBlock? _updateStatus;
 
     public MainWindow()
     {
@@ -48,6 +50,7 @@ public partial class MainWindow : Window
         WireDesignerOptionPersistence();
         UpdateClock();
         InitializeSessionRecovery();
+        Loaded += async (_, _) => await CheckForUpdatesAsync(false);
 
         _clockTimer.Interval = TimeSpan.FromSeconds(1);
         _clockTimer.Tick += (_, _) => UpdateClock();
@@ -163,6 +166,32 @@ public partial class MainWindow : Window
             SettingLabel("Time format"), _timeFormat,
             SettingLabel("Time zone"), _timeZone,
             _showDate, _showTime, _showSeconds, _showDayName));
+
+        _automaticUpdates = SettingCheckBox("Automatically check, download and install updates at startup");
+        _updateStatus = new TextBlock
+        {
+            Text = "Update status: not checked yet.",
+            TextWrapping = TextWrapping.Wrap,
+            FontSize = 11,
+            Foreground = Brush("#77808C"),
+            Margin = new Thickness(0, 4, 0, 8)
+        };
+        var checkNow = new Button
+        {
+            Content = "Check for updates now",
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Padding = new Thickness(14, 7, 14, 7)
+        };
+        checkNow.Click += async (_, _) => await CheckForUpdatesAsync(true);
+        content.Children.Add(CreateSettingsSection("APPLICATION UPDATES",
+            _automaticUpdates, _updateStatus, checkNow,
+            new TextBlock
+            {
+                Text = "Updates are downloaded only from the RSS Label Maker GitHub Releases page. A separate updater replaces the application and restarts it. Internet access is required; offline label work remains available.",
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 10,
+                Foreground = Brush("#77808C")
+            }));
 
         _autoFitText = SettingCheckBox("Auto-fit text to label (default)");
         _minimumFontSize = SettingTextBox("6");
@@ -361,6 +390,7 @@ public partial class MainWindow : Window
         if (_maximumFontSize is not null) _maximumFontSize.Text = _settings.MaximumFontSize.ToString();
         if (_barcodeEnabled is not null) _barcodeEnabled.IsChecked = _settings.BarcodeEnabled;
         if (_qrEnabled is not null) _qrEnabled.IsChecked = _settings.QrEnabled;
+        if (_automaticUpdates is not null) _automaticUpdates.IsChecked = _settings.AutomaticUpdatesEnabled;
     }
 
     private void SaveSettings_Click(object sender, RoutedEventArgs e) => SaveSettingsSilently();
@@ -381,6 +411,7 @@ public partial class MainWindow : Window
             _settings.MaximumFontSize = ParseFontSize(_maximumFontSize?.Text, 48);
             _settings.BarcodeEnabled = _barcodeEnabled?.IsChecked == true;
             _settings.QrEnabled = _qrEnabled?.IsChecked == true;
+            _settings.AutomaticUpdatesEnabled = _automaticUpdates?.IsChecked != false;
 
             if (_settings.MinimumFontSize <= 0 || _settings.MaximumFontSize < _settings.MinimumFontSize)
                 throw new InvalidOperationException("Maximum font size must be greater than or equal to the positive minimum font size.");
@@ -398,6 +429,37 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             MessageBox.Show(this, ex.Message, "Settings could not be saved", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private async Task CheckForUpdatesAsync(bool userRequested)
+    {
+        if (!userRequested && !_settings.AutomaticUpdatesEnabled) return;
+        if (_updateStatus is not null) _updateStatus.Text = "Checking the RSS Label Maker release channel…";
+
+        try
+        {
+            var result = await UpdateService.CheckAndStageAsync();
+            if (result is null)
+            {
+                if (_updateStatus is not null) _updateStatus.Text = "You are using the latest published version, or no release is available yet.";
+                return;
+            }
+
+            if (_updateStatus is not null)
+                _updateStatus.Text = $"Version {result.Version} is ready. Verifying package and preparing restart…";
+            SaveSessionSnapshot();
+            UpdateService.StartUpdater(result.PackagePath, Environment.ProcessPath ?? throw new InvalidOperationException("Cannot locate the running application."), Environment.ProcessId);
+            _sessionTimer.Stop();
+            _clockTimer.Stop();
+            Application.Current.Shutdown();
+        }
+        catch (Exception ex)
+        {
+            if (_updateStatus is not null) _updateStatus.Text = "Update check/install was not completed: " + ex.Message;
+            if (userRequested)
+                MessageBox.Show(this, ex.Message, "RSS Label Maker update", MessageBoxButton.OK, MessageBoxImage.Warning);
+            System.Diagnostics.Debug.WriteLine("RLM update failed: " + ex);
         }
     }
 
@@ -877,6 +939,7 @@ public partial class MainWindow : Window
         public int MaximumFontSize { get; set; } = 48;
         public bool BarcodeEnabled { get; set; }
         public bool QrEnabled { get; set; }
+        public bool AutomaticUpdatesEnabled { get; set; } = true;
     }
 
     private sealed class ProductRow
