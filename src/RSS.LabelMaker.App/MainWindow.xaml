@@ -26,6 +26,9 @@
      <Button x:Name="NavPrint" Content="▤   Print Manager" Click="Nav_Click" Tag="Print" HorizontalContentAlignment="Left" Margin="10,2" Background="Transparent" Foreground="#D4D8DE"/>
      <Button x:Name="NavImport" Content="⇧   Import / Export" Click="Nav_Click" Tag="Import" HorizontalContentAlignment="Left" Margin="10,2" Background="Transparent" Foreground="#D4D8DE"/>
      <Button x:Name="NavCompanyProfiles" Content="▣   Import By / Distributed By" Click="Nav_Click" Tag="CompanyProfiles" HorizontalContentAlignment="Left" Margin="10,2" Background="Transparent" Foreground="#D4D8DE"/>
+     <TextBlock Text="INFORMATION" Foreground="#777F89" FontSize="10" FontWeight="Bold" Margin="22,28,0,12"/>
+     <Button x:Name="NavAbout" Content="ⓘ   About RSS" Click="Nav_Click" Tag="About" HorizontalContentAlignment="Left" Margin="10,2" Background="Transparent" Foreground="#D4D8DE"/>
+     <Button x:Name="NavContact" Content="✉   Contact Us" Click="Nav_Click" Tag="Contact" HorizontalContentAlignment="Left" Margin="10,2" Background="Transparent" Foreground="#D4D8DE"/>
      <TextBlock Text="PREFERENCES" Foreground="#777F89" FontSize="10" FontWeight="Bold" Margin="22,28,0,12"/>
      <Button x:Name="NavSettings" Content="⚙   Settings" Click="Nav_Click" Tag="Settings" HorizontalContentAlignment="Left" Margin="10,2" Background="Transparent" Foreground="#D4D8DE"/>
     </StackPanel>
@@ -276,6 +279,69 @@
         <DataGrid.Columns><DataGridTextColumn Header="Type" Binding="{Binding ProfileType}" Width="140"/><DataGridTextColumn Header="Company / Person" Binding="{Binding Name}" Width="2*"/><DataGridTextColumn Header="Full address" Binding="{Binding Address}" Width="3*"/><DataGridTextColumn Header="Contact" Binding="{Binding Contact}" Width="*"/></DataGrid.Columns>
        </DataGrid>
       </DockPanel>
+     </Border>
+    </Grid>
+
+    <Grid x:Name="AboutPage" Visibility="Collapsed">
+     <ScrollViewer VerticalScrollBarVisibility="Auto">
+      <StackPanel>
+       <Border Background="#20242B" CornerRadius="10" Padding="28" Margin="0,0,0,18">
+        <StackPanel>
+         <TextBlock Text="RAZEEN SECURE SOLUTION" Foreground="#D5AD5B" FontSize="11" FontWeight="Bold"/>
+         <TextBlock Text="Technology that secures, connects and simplifies." Foreground="White" FontSize="25" FontWeight="Bold" TextWrapping="Wrap" Margin="0,10,0,8"/>
+         <TextBlock Text="Razeen Secure Solution (RSS) is a technology company established in 2015, delivering software, security and IT solutions for businesses and individuals." Foreground="#D5D9DF" FontSize="13" TextWrapping="Wrap" MaxWidth="780"/>
+         <Button Content="Visit www.rssapps.net  ↗" Click="OpenWebsite_Click" HorizontalAlignment="Left" Background="#C69A43" Foreground="#20242B" Padding="18,9" Margin="0,18,0,0"/>
+        </StackPanel>
+       </Border>
+       <TextBlock Text="OUR SERVICES" FontSize="11" FontWeight="Bold" Foreground="#77808C" Margin="0,0,0,12"/>
+       <UniformGrid Columns="3" Margin="0,0,0,18">
+        <Border Background="White" CornerRadius="8" Padding="18" Margin="0,0,12,0"><StackPanel><TextBlock Text="SOFTWARE DEVELOPMENT" FontWeight="Bold" FontSize="12"/><TextBlock Text="Mobile and PC applications, business software and AI-powered solutions." Foreground="#77808C" TextWrapping="Wrap" FontSize="12" Margin="0,8,0,0"/></StackPanel></Border>
+        <Border Background="White" CornerRadius="8" Padding="18" Margin="0,0,12,0"><StackPanel><TextBlock Text="CCTV &amp; SECURITY" FontWeight="Bold" FontSize="12"/><TextBlock Text="CCTV camera installation and security system solutions." Foreground="#77808C" TextWrapping="Wrap" FontSize="12" Margin="0,8,0,0"/></StackPanel></Border>
+        <Border Background="White" CornerRadius="8" Padding="18"><StackPanel><TextBlock Text="IT &amp; NETWORKING" FontWeight="Bold" FontSize="12"/><TextBlock Text="Networking, system administration, troubleshooting and cloud services." Foreground="#77808C" TextWrapping="Wrap" FontSize="12" Margin="0,8,0,0"/></StackPanel></Border>
+       </UniformGrid>
+       <Border Background="White" CornerRadius="8" Padding="20">
+        <StackPanel>
+         <TextBlock Text="RSS LABEL MAKER" FontWeight="Bold" FontSize="13"/>
+         <TextBlock Text="A free, standalone Windows label-design application developed by Razeen Secure Solution. Designed for product information, nutrition values, label layout and Windows-compatible printers." Foreground="#77808C" TextWrapping="Wrap" FontSize="12" Margin="0,8,0,14"/>
+         <TextBlock Text="Website: www.rssapps.net" FontSize="12" Margin="0,2"/>
+         <TextBlock Text="Phone: +94 77 115 5504  |  +94 70 155 5504" FontSize="12" Margin="0,2"/>
+         <TextBlock Text="Email: riyaz@rssapps.net" FontSize="12" Margin="0,2"/>
+        </StackPanel>
+       </Border>
+      </StackPanel>
+     </ScrollViewer>
+    </Grid>
+    <Grid x:Name="ContactPage" Visibility="Collapsed">
+     <Grid.ColumnDefinitions><ColumnDefinition Width="2*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+     <Border Background="White" CornerRadius="8" Padding="24" Margin="0,0,16,0">
+      <ScrollViewer VerticalScrollBarVisibility="Auto">
+       <StackPanel>
+        <TextBlock Text="SEND US A MESSAGE" FontSize="11" FontWeight="Bold" Foreground="#77808C" Margin="0,0,0,16"/>
+        <TextBlock Text="Your name *" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="ContactName" MaxLength="120" Margin="0,0,0,12"/>
+        <TextBlock Text="Your email *" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="ContactEmail" MaxLength="254" Margin="0,0,0,12"/>
+        <TextBlock Text="Phone (optional)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="ContactPhone" MaxLength="40" Margin="0,0,0,12"/>
+        <TextBlock Text="Subject *" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="ContactSubject" MaxLength="180" Margin="0,0,0,12"/>
+        <TextBlock Text="Message *" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="ContactMessage" MaxLength="5000" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="145" VerticalScrollBarVisibility="Auto" Margin="0,0,0,14"/>
+        <StackPanel Orientation="Horizontal"><Button Content="Prepare &amp; Send Email" Click="SendContactMessage_Click" Background="#C69A43" Foreground="#20242B" Padding="18,9" Margin="0,0,8,0"/><Button Content="Clear form" Click="ClearContactForm_Click" Padding="16,9"/></StackPanel>
+        <TextBlock x:Name="ContactStatus" Foreground="#4E7B5C" FontSize="11" TextWrapping="Wrap" Margin="0,12,0,0"/>
+       </StackPanel>
+      </ScrollViewer>
+     </Border>
+     <Border Grid.Column="1" Background="White" CornerRadius="8" Padding="22">
+      <StackPanel>
+       <TextBlock Text="CONTACT DETAILS" FontSize="11" FontWeight="Bold" Foreground="#77808C" Margin="0,0,0,14"/>
+       <TextBlock Text="Razeen Secure Solution" FontSize="17" FontWeight="Bold" TextWrapping="Wrap"/>
+       <TextBlock Text="Website" FontSize="10" Foreground="#77808C" Margin="0,18,0,4"/>
+       <TextBlock Text="www.rssapps.net" FontSize="13" Foreground="#A77A2F"/>
+       <TextBlock Text="Phone" FontSize="10" Foreground="#77808C" Margin="0,16,0,4"/>
+       <TextBlock Text="+94 77 115 5504" FontSize="13"/>
+       <TextBlock Text="+94 70 155 5504" FontSize="13" Margin="0,4,0,0"/>
+       <TextBlock Text="Email" FontSize="10" Foreground="#77808C" Margin="0,16,0,4"/>
+       <TextBlock Text="riyaz@rssapps.net" FontSize="13"/>
+       <Border Height="1" Background="#E6E8EB" Margin="0,20"/>
+       <TextBlock Text="Email sending" FontWeight="Bold" FontSize="11"/>
+       <TextBlock Text="The form prepares your message in the default email application. Review the draft and press Send there. No message is sent without your confirmation." Foreground="#77808C" FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"/>
+      </StackPanel>
      </Border>
     </Grid>
     <!-- Import and settings placeholder pages -->
