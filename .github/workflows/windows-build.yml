@@ -27,7 +27,7 @@ jobs:
         run: dotnet --info
 
       - name: Restore dependencies
-        run: dotnet restore .\RSS.LabelMaker.sln
+        run: dotnet restore .\\RSS.LabelMaker.sln -r win-x64
 
       - name: Build Release
         run: dotnet build .\RSS.LabelMaker.sln -c Release --no-restore
