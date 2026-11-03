@@ -1,7 +1,7 @@
 <Application x:Class="RSS.LabelMaker.App.App"
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
- StartupUri="MainWindow.xaml">
+>
  <Application.Resources>
   <Color x:Key="Ink">#20242B</Color>
   <Color x:Key="Gold">#C69A43</Color>
