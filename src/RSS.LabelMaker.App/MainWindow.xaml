@@ -136,7 +136,7 @@
        <TextBlock Text="Template" FontSize="11"/><ComboBox SelectedIndex="0" Margin="0,5,0,12"><ComboBoxItem Content="Food Product Label"/><ComboBoxItem Content="General Product Label"/><ComboBoxItem Content="Barcode &amp; Price Label"/></ComboBox>
        <TextBlock Text="Label width (mm)" FontSize="11"/><TextBox x:Name="LabelWidth" Text="70" Margin="0,5,0,12"/>
        <TextBlock Text="Label height (mm)" FontSize="11"/><TextBox x:Name="LabelHeight" Text="45" Margin="0,5,0,12"/>
-       <TextBlock Text="Paper" FontSize="11"/><ComboBox SelectedIndex="0" Margin="0,5,0,12"><ComboBoxItem Content="A4 — 210 × 297 mm"/><ComboBoxItem Content="A5 — 148 × 210 mm"/><ComboBoxItem Content="Letter"/></ComboBox>
+       <TextBlock Text="Paper" FontSize="11"/><ComboBox x:Name="DesignerPaperSize" SelectedIndex="0" Margin="0,5,0,12"><ComboBoxItem Content="A4 — 210 × 297 mm"/><ComboBoxItem Content="A5 — 148 × 210 mm"/><ComboBoxItem Content="Letter"/></ComboBox>
        <TextBlock Text="Layout" FontSize="11"/><ComboBox SelectedIndex="0" Margin="0,5,0,12"><ComboBoxItem Content="Automatic rows &amp; columns"/><ComboBoxItem Content="Manual rows &amp; columns"/></ComboBox>
        <Button Content="Apply dimensions" Click="ApplyLayout_Click" Background="#C69A43" Margin="0,8,0,0"/>
        <TextBlock x:Name="LayoutStatus" Text="A4 sheet · Actual size preview" Foreground="#77808C" FontSize="10" TextWrapping="Wrap" Margin="0,12,0,0"/>
