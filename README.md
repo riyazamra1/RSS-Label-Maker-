@@ -18,6 +18,15 @@ Native Windows desktop label-design and printing application by Razeen Secure So
 - Windows-installed printer discovery and a 100 mm calibration-page print action.
 - Logo watermark image selection, local binary persistence in SQLite, remove action and continuously adjustable 0–100% opacity setting. The current watermark preview is not yet integrated into final label print/PDF rendering.
 
+## Account registration and offline use
+
+- Mandatory first-time registration and email verification are part of the approved product requirements.
+- The planned authentication service is a separate Cloudflare Worker with D1 account/session metadata and Resend transactional verification emails.
+- Product records, label designs, templates, watermark assets and print jobs remain on the PC in SQLite; they are not uploaded to the authentication service.
+- After a PC is verified, normal label creation, editing, preview and printing must continue to work offline. The verified device credential must be protected with Windows DPAPI / Windows Credential Manager.
+- Sign-in, sign-out and password recovery are required. New or unverified installations must not bypass the verification gate.
+- Authentication backend implementation and production deployment are not yet verified. No live service, DNS route or email delivery should be assumed available until separately configured and tested.
+
 ## Company contact details
 
 - Website: https://www.rssapps.net
@@ -52,7 +61,7 @@ dotnet build .\RSS.LabelMaker.sln -c Release
 dotnet run --project .\src\RSS.LabelMaker.App\RSS.LabelMaker.App.csproj
 ```
 
-This is a native WPF application. It is not a WebView wrapper and does not require RSS Core, a server, sign-in or a subscription.
+This is a native WPF application, not a WebView wrapper. It does not depend on RSS Core or a subscription. Mandatory first-time email verification uses a separate authentication service; already-authorized PCs must retain offline label functionality.
 
 See [REQUIREMENTS.md](REQUIREMENTS.md) for the approved product specification.
 
