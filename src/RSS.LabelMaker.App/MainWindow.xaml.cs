@@ -175,11 +175,17 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ProductName_KeyUp(object sender, KeyEventArgs e) => UpdatePreview();
+    private void ProductName_KeyUp(object sender, KeyEventArgs e) => HandleProductNameInput();
 
-    private void ProductName_TextChanged(object sender, TextChangedEventArgs e)
+    private void ProductName_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) => HandleProductNameInput();
+
+    private void HandleProductNameInput()
     {
-        if (_isLoadingProduct || _editingProductId is null) return;
+        if (_isLoadingProduct || _editingProductId is null)
+        {
+            UpdatePreview();
+            return;
+        }
 
         var editingProduct = _products.FirstOrDefault(p => p.Id == _editingProductId);
         if (editingProduct is not null &&
