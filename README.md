@@ -21,12 +21,12 @@ Native Windows desktop label-design and printing application by Razeen Secure So
 ## Account registration and offline use
 
 - Mandatory first-time registration and email verification are part of the approved product requirements.
-- The planned authentication service is a separate Cloudflare Worker with D1 account/session metadata and Resend transactional verification emails.
+- Authentication, registration, verification, licensing, device activation, shared-user seats and entitlement checks are managed centrally by RSS Core (`https://rsscore.cv`). The desktop application must not create a separate account database or authentication Worker.
 - Product records, label designs, templates, watermark assets and print jobs remain on the PC in SQLite; they are not uploaded to the authentication service.
 - After a PC is verified, normal label creation, editing, preview and printing must continue to work offline. The verified device credential must be protected with Windows DPAPI / Windows Credential Manager.
 - Sign-in, sign-out and password recovery are required. New or unverified installations must not bypass the verification gate.
-- Authentication backend implementation and production deployment are not yet verified. No live service, DNS route or email delivery should be assumed available until separately configured and tested.
-- Backend source, D1 migration and deployment checklist: [cloudflare/auth-worker/README.md](cloudflare/auth-worker/README.md).
+- RSS Core API capabilities must be checked against its implemented and deployed contract before the desktop client enables each feature. Do not assume a route is live merely because it appears in a requirements document.
+- Licensing, device activation, quota enforcement and Google Drive backup are specified in `REQUIREMENTS.md` and must use RSS Core as the authority.
 
 ## Company contact details
 
