@@ -276,6 +276,19 @@ Requirements:
 - Installer and application must support the declared Windows 10/11 target; validate actual OS/runtime requirements during build.
 - Core label-making remains free standalone use with no forced sign-in or RSS Core connection. Premium entitlement checks apply only to automatic transliteration after the five-use free allowance.
 
+### 15.1 Automatic application updates and session recovery
+
+- Check for available application updates automatically at startup when internet access is available. Update checks and downloads must not block offline label-making.
+- Provide an application setting to enable or disable automatic updates. When enabled, download and install approved updates automatically; show the current version, available version and update progress.
+- Use a separate updater process so the running application is not required to replace its own executable. Stage the update, verify its authenticity and integrity before installation, and install safely.
+- Before closing for an update, save the current workspace and create a recoverable session checkpoint. Autosave active work locally so an unexpected application or updater exit does not discard recent edits.
+- After a successful update, launch RSS Label Maker automatically and restore the previous session, including the last active product, label/design, selected template, workspace/navigation state and the latest recoverable unsaved draft.
+- Session recovery must restore label content and editing state, including text, field visibility, colours, fonts, element positions, dimensions and other design settings. If a complete recovery is not possible, clearly identify what was recovered and retain the recovery data for manual restoration.
+- Preserve the local SQLite database, products, templates, company records, application settings, cached transliterations and licence/entitlement information during updates. Database migrations must be backed up and recoverable.
+- If download, verification, installation, migration or restart fails, retain or restore the previous working application version and protect user data. Do not delete recovery checkpoints until the updated application has launched successfully and recovery has completed.
+- Update checks require internet; normal product management, label design, session recovery from local data and printing must remain available offline.
+- Do not silently overwrite user work or install an unverified update package.
+
 ## 16. Testing and acceptance criteria
 
 1. Create and edit a product with English, Sinhala and Tamil names.
@@ -297,6 +310,8 @@ Requirements:
 12. Import Excel/CSV with field mapping and row-level validation.
 13. Back up and restore the SQLite database successfully.
 14. Build and launch the Windows installer on supported Windows 10 and Windows 11 test machines.
+
+15. Verify automatic update behaviour: update check/download, package verification, safe installation, automatic restart, restoration of the last session and latest recoverable draft, preservation of SQLite data/licence information, and rollback/data protection when an update fails.
 
 ## 17. Delivery milestones
 
