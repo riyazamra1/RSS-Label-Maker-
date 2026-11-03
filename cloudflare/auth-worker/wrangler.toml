@@ -1,0 +1,13 @@
+name = "rss-label-maker-auth"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "rss-label-maker-auth"
+database_id = "REPLACE_WITH_CLOUDFLARE_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
+[vars]
+APP_NAME = "RSS Label Maker"
+# Configure MAIL_FROM as a verified sender in Cloudflare Worker secrets/vars.
