@@ -19,7 +19,6 @@ Native Windows desktop label-design and printing application by Razeen Secure So
 This is an active development branch, not a release-ready application. The following approved requirements remain incomplete:
 
 - Reusable Import By and Distributed By company/person profiles with full addresses and product assignment.
-- Pieces-per-box, box price, optional per-piece price, and automatic/manual pricing modes.
 - Persisted, editable user templates; watermark settings and image assets must be stored per template.
 - Full designer editing (drag, resize, alignment, layers, undo/redo, barcode and QR).
 - Accurate physical sheet layout including margins, gaps, printer printable-area validation and partially-used-sheet starting position.
