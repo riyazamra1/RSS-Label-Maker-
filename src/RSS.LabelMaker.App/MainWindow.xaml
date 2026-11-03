@@ -131,7 +131,7 @@
          </Grid>
          <Grid Margin="0,10,0,0">
           <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-          <StackPanel Grid.Column="0" Margin="0,0,12,0"><TextBlock Text="Copies" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="Copies" Text="1"/></StackPanel>
+          <StackPanel Grid.Column="0" Margin="0,0,12,0"><TextBlock Text="Copies" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="Copies" Text="1" TextChanged="PrintCapacityInputs_Changed"/></StackPanel>
           <StackPanel Grid.Column="1" VerticalAlignment="Bottom" Orientation="Horizontal"><Button Content="New Product" Click="NewProduct_Click" Padding="12,9" Margin="0,0,8,0"/><Button x:Name="SaveProductButton" Content="Save Product" Click="SaveProduct_Click" Background="#C69A43" Foreground="#20242B" Padding="18,9"/></StackPanel>
          </Grid>
         </StackPanel>
@@ -190,8 +190,8 @@
       <StackPanel>
        <TextBlock Text="LABEL SETTINGS" FontWeight="Bold" FontSize="11" Foreground="#77808C" Margin="0,0,0,14"/>
        <TextBlock Text="Template" FontSize="11"/><ComboBox SelectedIndex="0" Margin="0,5,0,12"><ComboBoxItem Content="Food Product Label"/><ComboBoxItem Content="General Product Label"/><ComboBoxItem Content="Barcode &amp; Price Label"/></ComboBox>
-       <TextBlock Text="Label width (mm)" FontSize="11"/><TextBox x:Name="LabelWidth" Text="70" Margin="0,5,0,12"/>
-       <TextBlock Text="Label height (mm)" FontSize="11"/><TextBox x:Name="LabelHeight" Text="45" Margin="0,5,0,12"/>
+       <TextBlock Text="Label width (mm)" FontSize="11"/><TextBox x:Name="LabelWidth" Text="70" Margin="0,5,0,12" TextChanged="PrintCapacityInputs_Changed"/>
+       <TextBlock Text="Label height (mm)" FontSize="11"/><TextBox x:Name="LabelHeight" Text="45" Margin="0,5,0,12" TextChanged="PrintCapacityInputs_Changed"/>
        <TextBlock Text="Paper" FontSize="11"/><ComboBox x:Name="DesignerPaperSize" SelectedIndex="0" Margin="0,5,0,12"><ComboBoxItem Content="A4 — 210 × 297 mm"/><ComboBoxItem Content="A5 — 148 × 210 mm"/><ComboBoxItem Content="Letter"/></ComboBox>
        <TextBlock Text="Layout" FontSize="11"/><ComboBox SelectedIndex="0" Margin="0,5,0,12"><ComboBoxItem Content="Automatic rows &amp; columns"/><ComboBoxItem Content="Manual rows &amp; columns"/></ComboBox>
        <Button Content="Apply dimensions" Click="ApplyLayout_Click" Background="#C69A43" Margin="0,8,0,0"/>
@@ -260,30 +260,31 @@
       <StackPanel>
        <TextBlock Text="PRINT SETUP" FontSize="11" FontWeight="Bold" Foreground="#77808C" Margin="0,0,0,16"/>
        <TextBlock Text="Printer" FontSize="11"/><ComboBox x:Name="PrinterList" Margin="0,5,0,14"/>
-       <TextBlock Text="Paper size" FontSize="11"/><ComboBox x:Name="PrintPaperSize" SelectedIndex="0" Margin="0,5,0,10"><ComboBoxItem Content="A4"/><ComboBoxItem Content="A5"/><ComboBoxItem Content="Letter"/><ComboBoxItem Content="Custom"/></ComboBox>
-       <TextBlock Text="Custom page width (mm)" FontSize="11"/><TextBox x:Name="CustomPageWidth" Text="210" Margin="0,4,0,8"/>
-       <TextBlock Text="Custom page height (mm)" FontSize="11"/><TextBox x:Name="CustomPageHeight" Text="297" Margin="0,4,0,10"/>
-       <TextBlock Text="Orientation" FontSize="11"/><ComboBox x:Name="PrintOrientation" SelectedIndex="0" Margin="0,5,0,10"><ComboBoxItem Content="Portrait"/><ComboBoxItem Content="Landscape"/></ComboBox>
+       <TextBlock Text="Paper size" FontSize="11"/><ComboBox x:Name="PrintPaperSize" SelectedIndex="0" Margin="0,5,0,10" SelectionChanged="PrintCapacityInputs_Changed"><ComboBoxItem Content="A4"/><ComboBoxItem Content="A5"/><ComboBoxItem Content="Letter"/><ComboBoxItem Content="Custom"/></ComboBox>
+       <TextBlock Text="Custom page width (mm)" FontSize="11"/><TextBox x:Name="CustomPageWidth" Text="210" Margin="0,4,0,8" TextChanged="PrintCapacityInputs_Changed"/>
+       <TextBlock Text="Custom page height (mm)" FontSize="11"/><TextBox x:Name="CustomPageHeight" Text="297" Margin="0,4,0,10" TextChanged="PrintCapacityInputs_Changed"/>
+       <TextBlock Text="Orientation" FontSize="11"/><ComboBox x:Name="PrintOrientation" SelectedIndex="0" Margin="0,5,0,10" SelectionChanged="PrintCapacityInputs_Changed"><ComboBoxItem Content="Portrait"/><ComboBoxItem Content="Landscape"/></ComboBox>
        <TextBlock Text="Page margins (mm)" FontSize="11" FontWeight="Bold" Margin="0,4,0,4"/>
        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-        <StackPanel Grid.Column="0" Margin="0,0,6,0"><TextBlock Text="Left" FontSize="10"/><TextBox x:Name="MarginLeft" Text="8"/></StackPanel>
-        <StackPanel Grid.Column="1" Margin="6,0,0,0"><TextBlock Text="Right" FontSize="10"/><TextBox x:Name="MarginRight" Text="8"/></StackPanel>
+        <StackPanel Grid.Column="0" Margin="0,0,6,0"><TextBlock Text="Left" FontSize="10"/><TextBox x:Name="MarginLeft" Text="8" TextChanged="PrintCapacityInputs_Changed"/></StackPanel>
+        <StackPanel Grid.Column="1" Margin="6,0,0,0"><TextBlock Text="Right" FontSize="10"/><TextBox x:Name="MarginRight" Text="8" TextChanged="PrintCapacityInputs_Changed"/></StackPanel>
        </Grid>
        <Grid Margin="0,6,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-        <StackPanel Grid.Column="0" Margin="0,0,6,0"><TextBlock Text="Top" FontSize="10"/><TextBox x:Name="MarginTop" Text="8"/></StackPanel>
-        <StackPanel Grid.Column="1" Margin="6,0,0,0"><TextBlock Text="Bottom" FontSize="10"/><TextBox x:Name="MarginBottom" Text="8"/></StackPanel>
+        <StackPanel Grid.Column="0" Margin="0,0,6,0"><TextBlock Text="Top" FontSize="10"/><TextBox x:Name="MarginTop" Text="8" TextChanged="PrintCapacityInputs_Changed"/></StackPanel>
+        <StackPanel Grid.Column="1" Margin="6,0,0,0"><TextBlock Text="Bottom" FontSize="10"/><TextBox x:Name="MarginBottom" Text="8" TextChanged="PrintCapacityInputs_Changed"/></StackPanel>
        </Grid>
        <TextBlock Text="Label gaps (mm)" FontSize="11" FontWeight="Bold" Margin="0,10,0,4"/>
        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-        <StackPanel Grid.Column="0" Margin="0,0,6,0"><TextBlock Text="Horizontal" FontSize="10"/><TextBox x:Name="HorizontalLabelGap" Text="2"/></StackPanel>
-        <StackPanel Grid.Column="1" Margin="6,0,0,0"><TextBlock Text="Vertical" FontSize="10"/><TextBox x:Name="VerticalLabelGap" Text="2"/></StackPanel>
+        <StackPanel Grid.Column="0" Margin="0,0,6,0"><TextBlock Text="Horizontal" FontSize="10"/><TextBox x:Name="HorizontalLabelGap" Text="2" TextChanged="PrintCapacityInputs_Changed"/></StackPanel>
+        <StackPanel Grid.Column="1" Margin="6,0,0,0"><TextBlock Text="Vertical" FontSize="10"/><TextBox x:Name="VerticalLabelGap" Text="2" TextChanged="PrintCapacityInputs_Changed"/></StackPanel>
        </Grid>
        <TextBlock Text="ITEMS ON THIS SHEET" FontSize="11" FontWeight="Bold" Margin="0,14,0,5"/>
+       <CheckBox x:Name="EnableMultipleLabels" Content="Enable Multiple Labels (different products on one sheet)" IsChecked="True" Checked="PrintCapacityInputs_Changed" Unchecked="PrintCapacityInputs_Changed" FontSize="11" Margin="0,0,0,7"/>
        <TextBlock Text="Tick every product to include it. Copies are taken from each product's Copies field." FontSize="10" Foreground="#77808C" TextWrapping="Wrap" Margin="0,0,0,6"/>
        <ListBox x:Name="PrintProductsList" ItemsSource="{Binding}" MaxHeight="190" BorderBrush="#E6E8EB">
         <ListBox.ItemTemplate>
          <DataTemplate>
-          <CheckBox Content="{Binding English}" IsChecked="{Binding IsPrintSelected, Mode=TwoWay}" Padding="3" />
+          <CheckBox Content="{Binding English}" IsChecked="{Binding IsPrintSelected, Mode=TwoWay}" Padding="3" Checked="PrintProductSelection_Changed" Unchecked="PrintProductSelection_Changed" />
          </DataTemplate>
         </ListBox.ItemTemplate>
        </ListBox>
@@ -291,7 +292,8 @@
        <Button Content="Clear selection" Click="ClearPrintProducts_Click" HorizontalAlignment="Left" Margin="0,4,0,0"/>
        <Button Content="Refresh printers" Click="RefreshPrinters_Click" HorizontalAlignment="Left"/>
        <Button Content="Print Preview" Click="OpenPrintPreview_Click" Background="#C69A43" Margin="0,18,0,0" HorizontalAlignment="Left"/>
-       <TextBlock Text="Select a saved product in Products, set label dimensions in Designer, then print at actual size." Foreground="#77808C" FontSize="10" TextWrapping="Wrap" Margin="0,8,0,0"/>
+       <TextBlock Text="Select products above. Enable Multiple Labels to combine different products on the same sheet." Foreground="#77808C" FontSize="10" TextWrapping="Wrap" Margin="0,8,0,0"/>
+       <TextBlock x:Name="PrintCapacitySummary" Text="Capacity will appear when page and label settings are valid." Foreground="#4E7B5C" FontSize="11" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,10,0,0"/>
               <Button Content="Print test page" Click="TestPrint_Click" Background="#C69A43" Margin="0,18,0,0" HorizontalAlignment="Left"/>
        <TextBlock x:Name="PrintStatus" Text="Printer selection is read from Windows." Foreground="#77808C" FontSize="11" Margin="0,12,0,0" TextWrapping="Wrap"/>
       </StackPanel>
