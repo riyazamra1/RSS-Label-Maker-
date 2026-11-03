@@ -8,6 +8,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 using System.Windows.Media;
+using System.Windows.Input;
 using Microsoft.Win32;
 
 namespace RSS.LabelMaker.App;
@@ -21,12 +22,14 @@ public partial class MainWindow : Window
     private WatermarkStore? _watermarkStore;
     private ProductStore? _productStore;
     private string? _editingProductId;
+    private bool _isLoadingProduct;
 
     public MainWindow()
     {
         InitializeComponent();
         ProductsGrid.ItemsSource = _products;
         PrintProductsList.ItemsSource = _products;
+        EnglishName.ItemsSource = _products;
         try
         {
             _productStore = new ProductStore();
@@ -153,11 +156,101 @@ public partial class MainWindow : Window
     private void OpenProducts_Click(object sender, RoutedEventArgs e) => ShowPage("Products");
     private void OpenPrint_Click(object sender, RoutedEventArgs e) => ShowPage("Print");
 
+    private void ProductName_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isLoadingProduct) return;
+
+        if (EnglishName.SelectedItem is ProductRow selectedProduct)
+        {
+            LoadProductIntoForm(selectedProduct);
+            return;
+        }
+
+        if (_editingProductId is not null)
+        {
+            _editingProductId = null;
+            SaveProductButton.Content = "Save Product";
+            ClearProductDetails();
+            ProductStatus.Text = "New product name entered. Complete its details and save to add it to Items Manager.";
+        }
+    }
+
+    private void ProductName_KeyUp(object sender, KeyEventArgs e) => UpdatePreview();
+
+    private void ProductName_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) => UpdatePreview();
+
+    private void ClearProductDetails()
+    {
+        _isLoadingProduct = true;
+        try
+        {
+            SinhalaName.Clear(); TamilName.Clear();
+            Mfd.Clear(); Expiry.Clear(); Batch.Clear(); NetWeight.Clear();
+            MfdPrintOnPack.IsChecked = false; ExpiryPrintOnPack.IsChecked = false;
+            BatchPrintOnPack.IsChecked = false; NetWeightPrintOnPack.IsChecked = false;
+            Sugar.Clear(); Salt.Clear(); Fat.Clear(); Mrp.Clear();
+            ImportByProfile.SelectedIndex = -1; DistributedByProfile.SelectedIndex = -1;
+            ImportByName.Clear(); ImportByAddress.Clear();
+            DistributedByName.Clear(); DistributedByAddress.Clear();
+            PiecesPerBox.Clear(); BoxPrice.Clear();
+            ShowPerPiecePrice.IsChecked = false;
+            PerPiecePricingMode.SelectedIndex = 0; ManualPerPiecePrice.Clear();
+            Copies.Text = "1";
+        }
+        finally { _isLoadingProduct = false; }
+        UpdatePerPiecePrice();
+        UpdatePreview();
+    }
+
+    private void LoadProductIntoForm(ProductRow product)
+    {
+        _isLoadingProduct = true;
+        try
+        {
+            _editingProductId = product.Id;
+            EnglishName.Text = product.English;
+            EnglishName.SelectedItem = product;
+            SinhalaName.Text = product.Sinhala;
+            TamilName.Text = product.Tamil;
+            Mfd.Text = product.Mfd;
+            Expiry.Text = product.Expiry;
+            Batch.Text = product.Batch;
+            NetWeight.Text = product.NetWeight;
+            MfdPrintOnPack.IsChecked = product.MfdPrintOnPack;
+            ExpiryPrintOnPack.IsChecked = product.ExpiryPrintOnPack;
+            BatchPrintOnPack.IsChecked = product.BatchPrintOnPack;
+            NetWeightPrintOnPack.IsChecked = product.NetWeightPrintOnPack;
+            Sugar.Text = product.Sugar;
+            Salt.Text = product.Salt;
+            Fat.Text = product.Fat;
+            Mrp.Text = product.Mrp;
+            ImportByProfile.SelectedValue = product.ImportByProfileId;
+            DistributedByProfile.SelectedValue = product.DistributedByProfileId;
+            ImportByName.Text = string.IsNullOrWhiteSpace(product.ImportByName) ? product.Importer : product.ImportByName;
+            ImportByAddress.Text = product.ImportByAddress;
+            DistributedByName.Text = product.DistributedByName;
+            DistributedByAddress.Text = product.DistributedByAddress;
+            PiecesPerBox.Text = product.PiecesPerBox;
+            BoxPrice.Text = product.BoxPrice;
+            ShowPerPiecePrice.IsChecked = product.ShowPerPiecePrice;
+            PerPiecePricingMode.SelectedIndex = product.PerPiecePricingMode == "Manual" ? 1 : 0;
+            ManualPerPiecePrice.Text = product.ManualPerPiecePrice;
+            Copies.Text = product.Copies;
+            SaveProductButton.Content = "Update Product";
+        }
+        finally { _isLoadingProduct = false; }
+
+        UpdatePerPiecePrice();
+        UpdatePreview();
+        ProductStatus.Text = $"Loaded '{product.English}'. Changes will update this saved item.";
+    }
+
     private void SaveProduct_Click(object sender, RoutedEventArgs e)
     {
-        if (string.IsNullOrWhiteSpace(EnglishName.Text))
+        var productName = EnglishName.Text.Trim();
+        if (string.IsNullOrWhiteSpace(productName))
         {
-            ProductStatus.Text = "Enter an English product name before saving.";
+            ProductStatus.Text = "Select an existing product or enter a new English product name.";
             return;
         }
         if (_productStore is null)
@@ -186,10 +279,15 @@ public partial class MainWindow : Window
             }
         }
 
+        var matchingProduct = _editingProductId is null
+            ? _products.FirstOrDefault(p => p.English.Equals(productName, StringComparison.OrdinalIgnoreCase))
+            : null;
+        var productId = _editingProductId ?? matchingProduct?.Id ?? Guid.NewGuid().ToString("N");
+
         var product = new ProductRow
         {
-            Id = _editingProductId ?? Guid.NewGuid().ToString("N"),
-            English = EnglishName.Text.Trim(),
+            Id = productId,
+            English = productName,
             Sinhala = SinhalaName.Text.Trim(),
             Tamil = TamilName.Text.Trim(),
             Mfd = Mfd.Text.Trim(),
@@ -221,23 +319,35 @@ public partial class MainWindow : Window
 
         try
         {
-            if (_editingProductId is null)
+            var existing = _products.FirstOrDefault(p => p.Id == product.Id);
+            if (existing is null)
             {
                 _productStore.Save(product);
                 _products.Add(product);
-                ProductStatus.Text = "Product saved to the local database.";
+                ProductStatus.Text = $"New product '{product.English}' saved automatically to Items Manager.";
             }
             else
             {
                 _productStore.Update(product);
-                var index = _products.ToList().FindIndex(item => item.Id == product.Id);
+                var index = _products.IndexOf(existing);
                 if (index >= 0) _products[index] = product;
-                _editingProductId = null;
-                SaveProductButton.Content = "Save Product";
-                ProductStatus.Text = "Product updated in the local database.";
+                ProductStatus.Text = $"Product '{product.English}' updated in Items Manager.";
             }
+
+            _editingProductId = product.Id;
+            _isLoadingProduct = true;
+            try
+            {
+                EnglishName.Items.Refresh();
+                EnglishName.SelectedItem = product;
+                EnglishName.Text = product.English;
+            }
+            finally { _isLoadingProduct = false; }
+
+            SaveProductButton.Content = "Update Product";
             ProductCount.Text = _products.Count.ToString();
             ProductsGrid.Items.Refresh();
+            PrintProductsList.Items.Refresh();
             UpdatePreview();
         }
         catch (Exception ex)
@@ -253,38 +363,7 @@ public partial class MainWindow : Window
             ProductStatus.Text = "Select a product from the list first.";
             return;
         }
-        _editingProductId = product.Id;
-        EnglishName.Text = product.English;
-        SinhalaName.Text = product.Sinhala;
-        TamilName.Text = product.Tamil;
-        Mfd.Text = product.Mfd;
-        Expiry.Text = product.Expiry;
-        Batch.Text = product.Batch;
-        NetWeight.Text = product.NetWeight;
-        MfdPrintOnPack.IsChecked = product.MfdPrintOnPack;
-        ExpiryPrintOnPack.IsChecked = product.ExpiryPrintOnPack;
-        BatchPrintOnPack.IsChecked = product.BatchPrintOnPack;
-        NetWeightPrintOnPack.IsChecked = product.NetWeightPrintOnPack;
-        Sugar.Text = product.Sugar;
-        Salt.Text = product.Salt;
-        Fat.Text = product.Fat;
-        Mrp.Text = product.Mrp;
-        ImportByProfile.SelectedValue = product.ImportByProfileId;
-        DistributedByProfile.SelectedValue = product.DistributedByProfileId;
-        ImportByName.Text = string.IsNullOrWhiteSpace(product.ImportByName) ? product.Importer : product.ImportByName;
-        ImportByAddress.Text = product.ImportByAddress;
-        DistributedByName.Text = product.DistributedByName;
-        DistributedByAddress.Text = product.DistributedByAddress;
-        PiecesPerBox.Text = product.PiecesPerBox;
-        BoxPrice.Text = product.BoxPrice;
-        ShowPerPiecePrice.IsChecked = product.ShowPerPiecePrice;
-        PerPiecePricingMode.SelectedIndex = product.PerPiecePricingMode == "Manual" ? 1 : 0;
-        ManualPerPiecePrice.Text = product.ManualPerPiecePrice;
-        UpdatePerPiecePrice();
-        Copies.Text = product.Copies;
-        SaveProductButton.Content = "Update Product";
-        ProductStatus.Text = $"Editing: {product.English}. Change the fields and click Update Product.";
-        UpdatePreview();
+        LoadProductIntoForm(product);
     }
 
     private void DeleteProduct_Click(object sender, RoutedEventArgs e)
