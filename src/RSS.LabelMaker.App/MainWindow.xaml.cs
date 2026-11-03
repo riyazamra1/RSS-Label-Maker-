@@ -717,127 +717,204 @@ public partial class MainWindow : Window
         }
     }
 
-    private void PrintSelectedLabel_Click(object sender, RoutedEventArgs e)
+    private void PrintSelectedLabel_Click(object sender, RoutedEventArgs e) => OpenPrintPreview_Click(sender, e);
+
+    private void OpenPrintPreview_Click(object sender, RoutedEventArgs e)
     {
         if (ProductsGrid.SelectedItem is not ProductRow product)
         {
-            PrintStatus.Text = "Select a saved product on the Products page before printing.";
+            PrintStatus.Text = "Select a saved product on the Products page before opening print preview.";
             return;
         }
-        if (!TryReadMillimetres(LabelWidth.Text, out var widthMm) ||
-            !TryReadMillimetres(LabelHeight.Text, out var heightMm) ||
-            widthMm <= 0 || heightMm <= 0 || widthMm > 500 || heightMm > 500)
+        if (!TryReadMillimetres(LabelWidth.Text, out var labelWidthMm) ||
+            !TryReadMillimetres(LabelHeight.Text, out var labelHeightMm) ||
+            labelWidthMm <= 0 || labelHeightMm <= 0 || labelWidthMm > 500 || labelHeightMm > 500)
         {
-            PrintStatus.Text = "Set valid label dimensions (greater than 0 and no more than 500 mm) in the Designer first.";
+            PrintStatus.Text = "Set valid label dimensions in the Designer first.";
             return;
         }
+        if (!TryGetPrintPageSettings(out var pageWidthMm, out var pageHeightMm, out var marginMm, out var gapMm, out var orientation))
+            return;
 
-        try
+        var copies = int.TryParse(product.Copies, NumberStyles.None, CultureInfo.CurrentCulture, out var parsedCopies)
+            ? Math.Clamp(parsedCopies, 1, 500) : 1;
+        var columns = (int)Math.Floor((pageWidthMm - 2 * marginMm + gapMm) / (labelWidthMm + gapMm));
+        var rows = (int)Math.Floor((pageHeightMm - 2 * marginMm + gapMm) / (labelHeightMm + gapMm));
+        if (columns < 1 || rows < 1)
         {
-            using var server = new LocalPrintServer();
-            var dialog = new PrintDialog();
-            if (PrinterList.SelectedItem is string selectedPrinter && !string.IsNullOrWhiteSpace(selectedPrinter))
-                dialog.PrintQueue = server.GetPrintQueue(selectedPrinter);
-            if (dialog.ShowDialog() != true)
-            {
-                PrintStatus.Text = "Product-label print cancelled.";
-                return;
-            }
-
-            const double mmToDip = 96d / 25.4d;
-            var width = (double)widthMm * mmToDip;
-            var height = (double)heightMm * mmToDip;
-            var copies = int.TryParse(product.Copies, NumberStyles.None, CultureInfo.CurrentCulture, out var parsedCopies)
-                ? Math.Clamp(parsedCopies, 1, 500) : 1;
-            var watermark = _watermarkStore?.Load() ?? (Image: (byte[]?)null, Opacity: 0d);
-            BitmapSource? watermarkImage = watermark.Image is { Length: > 0 } bytes ? DecodeWatermark(bytes) : null;
-            var visual = new DrawingVisual();
-            using (var dc = visual.RenderOpen())
-            {
-                dc.DrawRectangle(Brushes.White, new Pen(Brushes.Black, 0.7), new Rect(0, 0, width, height));
-                var pad = Math.Max(5d, Math.Min(width, height) * 0.045d);
-                if (watermarkImage is not null && watermark.Opacity > 0)
-                {
-                    var imageRect = new Rect(pad, pad, Math.Max(1, width - 2 * pad), Math.Max(1, height - 2 * pad));
-                    dc.PushOpacity(Math.Clamp(watermark.Opacity, 0d, 1d));
-                    dc.DrawImage(watermarkImage, imageRect);
-                    dc.Pop();
-                }
-
-                var compact = Math.Min(width, height) / 100d;
-                var titleSize = Math.Clamp(compact * 8.5d, 7d, 24d);
-                var bodySize = Math.Clamp(compact * 3.7d, 5d, 11d);
-                var smallSize = Math.Clamp(compact * 2.8d, 4.5d, 8d);
-                var y = pad;
-                DrawLabelText(dc, product.English.ToUpperInvariant(), pad, y, width - 2 * pad, titleSize, true, Brushes.DarkRed, TextAlignment.Center);
-                y += titleSize * 1.35d;
-                var localName = string.Join("  •  ", new[] { product.Sinhala, product.Tamil }.Where(v => !string.IsNullOrWhiteSpace(v)));
-                if (localName.Length > 0)
-                {
-                    DrawLabelText(dc, localName, pad, y, width - 2 * pad, bodySize, false, Brushes.DarkRed, TextAlignment.Center);
-                    y += bodySize * 1.5d;
-                }
-
-                var metadata = new[]
-                {
-                    FormatPrintRow("M.F.D", product.Mfd, product.MfdPrintOnPack),
-                    FormatPrintRow("EXP.D", product.Expiry, product.ExpiryPrintOnPack),
-                    FormatPrintRow("B.No", product.Batch, product.BatchPrintOnPack),
-                    FormatPrintRow("N.Wt", product.NetWeight, product.NetWeightPrintOnPack)
-                };
-                foreach (var line in metadata.Where(v => v.Length > 0))
-                {
-                    DrawLabelText(dc, line, pad, y, width - 2 * pad, bodySize, false, Brushes.Black, TextAlignment.Left);
-                    y += bodySize * 1.25d;
-                }
-
-                foreach (var party in new[]
-                {
-                    ("Import By", product.ImportByName, product.ImportByAddress),
-                    ("Distributed By", product.DistributedByName, product.DistributedByAddress)
-                })
-                {
-                    if (string.IsNullOrWhiteSpace(party.Item2) && string.IsNullOrWhiteSpace(party.Item3)) continue;
-                    DrawLabelText(dc, $"{party.Item1}: {party.Item2} {party.Item3}".Trim(), pad, y, width - 2 * pad, smallSize, false, Brushes.Black, TextAlignment.Left);
-                    y += smallSize * 1.25d;
-                }
-
-                var mrpSize = Math.Clamp(compact * 7d, 6d, 18d);
-                var mrp = $"M.R.P. (Rs.) {product.Mrp}";
-                DrawLabelText(dc, mrp, pad, Math.Min(y, height * 0.62d), width - 2 * pad, mrpSize, true, Brushes.Black, TextAlignment.Center);
-                if (product.ShowPerPiecePrice)
-                {
-                    var perPiece = product.PerPiecePricingMode == "Manual"
-                        ? product.ManualPerPiecePrice
-                        : decimal.TryParse(product.BoxPrice, NumberStyles.Number, CultureInfo.CurrentCulture, out var boxPrice) &&
-                          int.TryParse(product.PiecesPerBox, NumberStyles.None, CultureInfo.CurrentCulture, out var pieces) && pieces > 0
-                            ? (boxPrice / pieces).ToString("0.00", CultureInfo.CurrentCulture) : "";
-                    if (perPiece.Length > 0)
-                        DrawLabelText(dc, $"Per Piece (Rs.) {perPiece}", pad, Math.Min(y + mrpSize * 1.35d, height * 0.73d), width - 2 * pad, bodySize, true, Brushes.Black, TextAlignment.Center);
-                }
-
-                var panelTop = height - pad - Math.Clamp(height * 0.24d, 18d, 55d);
-                var panelHeight = height - pad - panelTop;
-                var panelWidth = (width - 2 * pad) / 3d;
-                var nutrition = new[] { ("SUGAR", product.Sugar, Brushes.Firebrick), ("SALT", product.Salt, Brushes.SeaGreen), ("FAT", product.Fat, Brushes.DarkGoldenrod) };
-                for (var i = 0; i < nutrition.Length; i++)
-                {
-                    var rect = new Rect(pad + i * panelWidth, panelTop, panelWidth - 1, panelHeight);
-                    dc.DrawRectangle(nutrition[i].Item3, null, rect);
-                    DrawLabelText(dc, nutrition[i].Item1, rect.X + 1, rect.Y + 2, rect.Width - 2, smallSize, true, Brushes.White, TextAlignment.Center);
-                    DrawLabelText(dc, $"{(string.IsNullOrWhiteSpace(nutrition[i].Item2) ? "—" : nutrition[i].Item2)} g/100g",
-                        rect.X + 1, rect.Y + smallSize + 4, rect.Width - 2, smallSize, false, Brushes.White, TextAlignment.Center);
-                }
-            }
-
-            for (var i = 0; i < copies; i++)
-                dialog.PrintVisual(visual, $"RSS Label Maker - {product.English} ({i + 1}/{copies})");
-            PrintStatus.Text = $"{copies} label copy/copies sent to {dialog.PrintQueue?.Name ?? "the selected printer"}. Confirm the physical size with a test print.";
+            PrintStatus.Text = "The selected label does not fit inside the page margins. Reduce the label size or margins.";
+            return;
         }
-        catch (Exception ex)
+        var perPage = columns * rows;
+        var pageCount = (int)Math.Ceiling(copies / (double)perPage);
+        var pages = new List<DrawingVisual>();
+        for (var page = 0; page < pageCount; page++)
+            pages.Add(BuildSheetVisual(product, pageWidthMm, pageHeightMm, labelWidthMm, labelHeightMm,
+                marginMm, gapMm, Math.Min(perPage, copies - page * perPage), columns));
+
+        var preview = new PrintPreviewWindow(pages, pageWidthMm, pageHeightMm, copies, perPage, orientation);
+        preview.Owner = this;
+        preview.ShowDialog();
+        PrintStatus.Text = $"Print layout: {columns} columns × {rows} rows; {perPage} labels per page; {pageCount} page(s) for {copies} copies.";
+    }
+
+    private bool TryGetPrintPageSettings(out decimal pageWidthMm, out decimal pageHeightMm, out decimal marginMm, out decimal gapMm, out PageOrientation orientation)
+    {
+        pageWidthMm = 210m; pageHeightMm = 297m; marginMm = 8m; gapMm = 2m; orientation = PageOrientation.Portrait;
+        var selected = PrintPaperSize.SelectedItem is ComboBoxItem item ? item.Content?.ToString() : "A4";
+        switch (selected)
         {
-            PrintStatus.Text = $"Product label could not be printed: {ex.Message}";
+            case "A5": pageWidthMm = 148m; pageHeightMm = 210m; break;
+            case "Letter": pageWidthMm = 215.9m; pageHeightMm = 279.4m; break;
+            case "Custom":
+                if (!TryReadMillimetres(CustomPageWidth.Text, out pageWidthMm) ||
+                    !TryReadMillimetres(CustomPageHeight.Text, out pageHeightMm) ||
+                    pageWidthMm < 25m || pageHeightMm < 25m || pageWidthMm > 1000m || pageHeightMm > 1000m)
+                {
+                    PrintStatus.Text = "Custom page width and height must be between 25 and 1000 mm.";
+                    return false;
+                }
+                break;
         }
+        if (PrintOrientation.SelectedIndex == 1)
+        {
+            (pageWidthMm, pageHeightMm) = (pageHeightMm, pageWidthMm);
+            orientation = PageOrientation.Landscape;
+        }
+        if (!TryReadMillimetres(PageMargin.Text, out marginMm) || marginMm < 0m ||
+            !TryReadMillimetres(LabelGap.Text, out gapMm) || gapMm < 0m ||
+            marginMm * 2 >= Math.Min(pageWidthMm, pageHeightMm))
+        {
+            PrintStatus.Text = "Enter a valid non-negative page margin and label gap.";
+            return false;
+        }
+        return true;
+    }
+
+    private DrawingVisual BuildSheetVisual(ProductRow product, decimal pageWidthMm, decimal pageHeightMm,
+        decimal labelWidthMm, decimal labelHeightMm, decimal marginMm, decimal gapMm, int labelCount, int columns)
+    {
+        const double mmToDip = 96d / 25.4d;
+        var pageWidth = (double)pageWidthMm * mmToDip;
+        var pageHeight = (double)pageHeightMm * mmToDip;
+        var labelWidth = (double)labelWidthMm * mmToDip;
+        var labelHeight = (double)labelHeightMm * mmToDip;
+        var margin = (double)marginMm * mmToDip;
+        var gap = (double)gapMm * mmToDip;
+        var visual = new DrawingVisual();
+        using var dc = visual.RenderOpen();
+        dc.DrawRectangle(Brushes.White, null, new Rect(0, 0, pageWidth, pageHeight));
+        for (var i = 0; i < labelCount; i++)
+        {
+            var col = i % columns;
+            var row = i / columns;
+            dc.PushTransform(new TranslateTransform(margin + col * (labelWidth + gap), margin + row * (labelHeight + gap)));
+            DrawProductLabel(dc, product, labelWidth, labelHeight);
+            dc.Pop();
+        }
+        return visual;
+    }
+
+    private void DrawProductLabel(DrawingContext dc, ProductRow product, double width, double height)
+    {
+        dc.DrawRectangle(Brushes.White, new Pen(Brushes.Black, 0.7), new Rect(0, 0, width, height));
+        var pad = Math.Max(5d, Math.Min(width, height) * 0.045d);
+        var watermark = _watermarkStore?.Load() ?? (Image: (byte[]?)null, Opacity: 0d);
+        BitmapSource? watermarkImage = watermark.Image is { Length: > 0 } bytes ? DecodeWatermark(bytes) : null;
+        if (watermarkImage is not null && watermark.Opacity > 0)
+        {
+            dc.PushOpacity(Math.Clamp(watermark.Opacity, 0d, 1d));
+            dc.DrawImage(watermarkImage, new Rect(pad, pad, Math.Max(1, width - 2 * pad), Math.Max(1, height - 2 * pad)));
+            dc.Pop();
+        }
+        var compact = Math.Min(width, height) / 100d;
+        var titleSize = Math.Clamp(compact * 8.5d, 7d, 24d);
+        var bodySize = Math.Clamp(compact * 3.7d, 5d, 11d);
+        var smallSize = Math.Clamp(compact * 2.8d, 4.5d, 8d);
+        var y = pad;
+        DrawLabelText(dc, product.English.ToUpperInvariant(), pad, y, width - 2 * pad, titleSize, true, Brushes.DarkRed, TextAlignment.Center);
+        y += titleSize * 1.35d;
+        var localName = string.Join("  •  ", new[] { product.Sinhala, product.Tamil }.Where(v => !string.IsNullOrWhiteSpace(v)));
+        if (localName.Length > 0)
+        {
+            DrawLabelText(dc, localName, pad, y, width - 2 * pad, bodySize, false, Brushes.DarkRed, TextAlignment.Center);
+            y += bodySize * 1.5d;
+        }
+        var metadata = new[]
+        {
+            FormatPrintRow("M.F.D", product.Mfd, product.MfdPrintOnPack),
+            FormatPrintRow("EXP.D", product.Expiry, product.ExpiryPrintOnPack),
+            FormatPrintRow("B.No", product.Batch, product.BatchPrintOnPack),
+            FormatPrintRow("N.Wt", product.NetWeight, product.NetWeightPrintOnPack)
+        };
+        foreach (var line in metadata.Where(v => v.Length > 0))
+        {
+            DrawLabelText(dc, line, pad, y, width - 2 * pad, bodySize, false, Brushes.Black, TextAlignment.Left);
+            y += bodySize * 1.25d;
+        }
+        foreach (var party in new[]
+        {
+            ("Import By", product.ImportByName, product.ImportByAddress),
+            ("Distributed By", product.DistributedByName, product.DistributedByAddress)
+        })
+        {
+            if (string.IsNullOrWhiteSpace(party.Item2) && string.IsNullOrWhiteSpace(party.Item3)) continue;
+            DrawLabelText(dc, $"{party.Item1}: {party.Item2} {party.Item3}".Trim(), pad, y, width - 2 * pad, smallSize, false, Brushes.Black, TextAlignment.Left);
+            y += smallSize * 1.25d;
+        }
+        var mrpSize = Math.Clamp(compact * 7d, 6d, 18d);
+        DrawLabelText(dc, $"M.R.P. (Rs.) {product.Mrp}", pad, Math.Min(y, height * 0.62d), width - 2 * pad, mrpSize, true, Brushes.Black, TextAlignment.Center);
+        if (product.ShowPerPiecePrice)
+        {
+            var perPiece = product.PerPiecePricingMode == "Manual"
+                ? product.ManualPerPiecePrice
+                : decimal.TryParse(product.BoxPrice, NumberStyles.Number, CultureInfo.CurrentCulture, out var boxPrice) &&
+                  int.TryParse(product.PiecesPerBox, NumberStyles.None, CultureInfo.CurrentCulture, out var pieces) && pieces > 0
+                    ? (boxPrice / pieces).ToString("0.00", CultureInfo.CurrentCulture) : "";
+            if (perPiece.Length > 0)
+                DrawLabelText(dc, $"Per Piece (Rs.) {perPiece}", pad, Math.Min(y + mrpSize * 1.35d, height * 0.73d), width - 2 * pad, bodySize, true, Brushes.Black, TextAlignment.Center);
+        }
+        var panelTop = height - pad - Math.Clamp(height * 0.24d, 18d, 55d);
+        var panelHeight = height - pad - panelTop;
+        var panelWidth = (width - 2 * pad) / 3d;
+        var nutrition = new[] { ("SUGAR", product.Sugar, Brushes.Firebrick), ("SALT", product.Salt, Brushes.SeaGreen), ("FAT", product.Fat, Brushes.DarkGoldenrod) };
+        for (var i = 0; i < nutrition.Length; i++)
+        {
+            var rect = new Rect(pad + i * panelWidth, panelTop, panelWidth - 1, panelHeight);
+            dc.DrawRectangle(nutrition[i].Item3, null, rect);
+            DrawLabelText(dc, nutrition[i].Item1, rect.X + 1, rect.Y + 2, rect.Width - 2, smallSize, true, Brushes.White, TextAlignment.Center);
+            DrawLabelText(dc, $"{(string.IsNullOrWhiteSpace(nutrition[i].Item2) ? "—" : nutrition[i].Item2)} g/100g",
+                rect.X + 1, rect.Y + smallSize + 4, rect.Width - 2, smallSize, false, Brushes.White, TextAlignment.Center);
+        }
+    }
+
+    private static void PrintSheetVisuals(IReadOnlyList<DrawingVisual> pages, decimal pageWidthMm, decimal pageHeightMm, PageOrientation orientation)
+    {
+        using var server = new LocalPrintServer();
+        var dialog = new PrintDialog();
+        if (dialog.ShowDialog() != true) return;
+        const double mmToDip = 96d / 25.4d;
+        dialog.PrintTicket.PageMediaSize = new PageMediaSize((double)pageWidthMm * mmToDip, (double)pageHeightMm * mmToDip);
+        dialog.PrintTicket.PageOrientation = orientation;
+        for (var i = 0; i < pages.Count; i++)
+            dialog.PrintVisual(pages[i], $"RSS Label Maker - sheet {i + 1} of {pages.Count}");
+    }
+
+    private static void DrawLabelText(DrawingContext dc, string text, double x, double y, double maxWidth,
+        double fontSize, bool bold, Brush brush, TextAlignment alignment)
+    {
+        if (string.IsNullOrWhiteSpace(text) || maxWidth <= 0) return;
+        var typeface = new Typeface(new FontFamily("Arial"), FontStyles.Normal,
+            bold ? FontWeights.Bold : FontWeights.Normal, FontStretches.Normal);
+        var formatted = new FormattedText(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+            typeface, fontSize, brush, 1d)
+        {
+            MaxTextWidth = maxWidth,
+            MaxTextHeight = Math.Max(fontSize * 2.4d, fontSize + 1d),
+            TextAlignment = alignment,
+            Trimming = TextTrimming.CharacterEllipsis
+        };
+        dc.DrawText(formatted, new Point(x, y));
     }
 
     private static string FormatPrintRow(string label, string value, bool printOnPack)
