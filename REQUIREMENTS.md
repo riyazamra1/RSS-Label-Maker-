@@ -4,7 +4,7 @@
 **Publisher:** Razeen Secure Solution  
 **Repository:** riyazamra1/RSS-Label-Maker-  
 **Target OS:** Windows 10 and Windows 11  
-**Distribution:** Free standalone desktop application  
+**Distribution:** Free tier + RSS Core-managed licensed subscriptions  
 **Specification status:** Approved requirements baseline  
 **Version target:** 1.0.0
 
@@ -19,57 +19,98 @@ The reference is a layout guide, not a fixed-size template. Users must be able t
 - Native Windows desktop application; not a WebView wrapper.
 - C# / .NET 10 LTS / WPF.
 - SQLite local database.
-- Free software; mandatory account registration and email verification before first use. No subscription, paid activation or RSS Core dependency.
+- Mandatory account registration and email verification through RSS Core before first use.
+- RSS Core is the central user database, identity provider, license authority and subscription/entitlement authority. Do not create a separate RSS Label Maker user database or standalone authentication backend.
+- Free tier is available after registration and is subject to configurable daily label-print limits and feature restrictions. Paid plans are activated by redeeming a license key issued/validated by RSS Core.
+- License entitlements govern device count, shared-user seats, feature access, daily usage limits, cloud backup and restore.
 - Any printer installed and usable through the Windows printing subsystem.
-- Normal product management, design, preview and printing must work offline after the device has completed first-time online email verification.
+- Local label work is stored in SQLite. Offline access is governed by a cached, signed, time-bounded RSS Core entitlement; usage limits and revocations must reconcile with RSS Core when online.
 - Online translation is used only to generate Sinhala and Tamil product-name suggestions from an English product name. Translation results are cached locally.
 - No automatic translation of any other field.
 - No deployment requirement; deliver a Windows installer after validation.
 
-## 2A. Account registration, email verification and offline access — mandatory
+## 2A. RSS Core accounts, licensing and device authorization — mandatory
 
-### First-run access gate
-- On first launch, show a dedicated RSS Label Maker account screen. The user must register and verify the email address before entering the main application.
-- Registration fields: full name, email address, password and password confirmation. Validate required fields, email syntax and password policy before sending.
-- Registration creates a pending account; it must not grant application access until the email address is verified.
-- Send a short-lived, single-use email verification code through the server-side Resend integration. Never put the Resend API key or other backend secrets in the desktop executable.
-- Verification screen accepts the code, supports resend with cooldown, shows expiry/errors clearly and prevents brute-force guessing with server-side attempt limits and rate limits.
-- After successful verification, issue a device session and persist the verified-device credential securely using Windows DPAPI / Windows Credential Manager. Do not store plaintext passwords or reusable bearer tokens in SQLite, logs or ordinary settings files.
-- On subsequent launches, restore the remembered verified-device state without forcing registration again. Provide explicit Sign in, Sign out and Forgot password flows.
-- Password reset must use a time-limited, single-use email code or secure reset link; changing a password revokes other active sessions.
-- Sign out removes local device credentials and local offline trust. The user must authenticate again to access the application.
-- Do not expose whether an email is registered in public responses; use generic account recovery and registration responses where appropriate.
+### Central account database and identity
+- The user must register and verify their email before entering RSS Label Maker.
+- All account/profile details must be stored in the existing RSS Core user database. RSS Label Maker must not maintain a separate user/account database.
+- RSS Core is the source of truth for account identity, email verification, account status, license keys, subscription entitlements, device activations, shared-user membership, usage quotas and audit events.
+- The desktop app communicates with RSS Core over HTTPS using documented, versioned APIs. Email verification and password recovery emails are sent by RSS Core's existing transactional email mechanism; no separate RSS Label Maker Resend backend or D1 account database.
+- Keep product records, label designs, templates, watermark assets and print jobs local by default. Cloud backup content is stored in the user's authorized Google Drive unless a later approved RSS Core storage feature is specified.
 
-### Offline operation and account state
-- Internet is required for initial registration, email verification, first device authorization, sign-in and password recovery.
-- After successful verification, the authorized PC must be able to use product management, saved templates, label design, preview, and printing while offline.
-- Keep a locally protected verified-device credential / offline authorization record. Validate it locally at startup; synchronize revocation and account status whenever connectivity returns.
-- Explain the security boundary: an offline PC cannot learn about a server-side account suspension or remote revocation until it reconnects. Do not claim instant offline revocation.
-- Authentication outages must not corrupt or block access to already-authorized offline work. A new/unverified device must remain blocked until verification succeeds.
-- Authentication service must never store or receive product records, label content, watermark images, or print jobs.
+### License and subscription model
+- A registered user receives the RSS Label Maker Free entitlement automatically. The Free entitlement has a configurable daily label-print quota and feature restrictions.
+- Paid access is activated by entering a license key in the app. The key is validated and redeemed by RSS Core; the desktop app must never decide that a key is valid based only on local string format.
+- RSS Core returns a signed entitlement describing product/app, account, plan, status, validity period, allowed device activations, allowed shared-user seats, daily print quota, feature flags and cloud-backup permissions.
+- The established RSS Core payment architecture is retained: RSS Core owns the Payments module and integrates Payments.lk hosted checkout; no separate RSS Pay app/backend. Payment credentials remain server-side. Entitlements are activated only after a verified, idempotent payment webhook, never from a browser return URL.
+- Previously accepted commercial baseline: a one-time payment for one year of RSS Premium entitlement (not recurring monthly billing). The actual price remains unselected. Do not invent prices or imply auto-renewal.
+- License key redemption, renewal/replacement, expiry, refund/revocation and device deactivation are handled by RSS Core.
+- Show plan name, license status, expiry/valid-through date, active devices, available device slots, shared-user seats and current day's usage in the app.
 
-### Authentication service architecture
-- Separate Cloudflare Worker service with D1 for account, verification, device-session and password-reset metadata.
-- Resend transactional email API called only from the Worker using a server-side secret. Use an authenticated sender domain configured and verified in Resend before production email delivery.
-- Keep this service independent from RSS Core and from the local SQLite database.
-- Define versioned API contracts and migrations. Minimum operations: register, verify email code, resend verification, sign in, refresh/check device session, sign out/revoke device, request password reset, complete password reset, and health.
-- Store passwords using a modern salted, deliberately expensive password-hashing scheme supported by the Worker runtime; use constant-time comparisons for secret/code verification. Never store plaintext passwords or verification codes.
-- Verification codes: cryptographically random, short expiry, one-time use, bounded attempts, resend cooldown, and server-side rate limits for IP/email/device. Hash codes at rest.
-- Use HTTPS only, strict input validation, generic auth errors, safe CORS policy, request-size limits, structured security logging without passwords/codes/tokens, and protection against enumeration, replay and brute-force attempts.
-- Keep API base URL configurable for development and production; do not hardcode an unverified domain or deploy automatically.
-- Document required Cloudflare resources, D1 migrations, Worker secrets, Resend sender-domain setup and Windows client configuration.
+### Free tier restrictions
+- Free users have a configurable maximum number of labels printed per account per day. Count successful label output, not preview actions; define duplicate/copy handling consistently in the RSS Core usage policy.
+- PDF export is disabled for Free.
+- Saving reusable Import By / Distributed By master profiles is disabled for Free. Product-specific importer/distributor text may be entered for an individual product only if the final plan policy permits it.
+- Additional feature restrictions must be controlled by server-provided feature flags, not hard-coded assumptions. The plan matrix must be finalized before release.
+- When a user reaches the daily quota, clearly show the reset time and offer license-key redemption / plan upgrade. Do not delete or lock existing local data.
+- Quota enforcement must be resistant to clock rollback and local database edits. The server is authoritative when online; cached signed quota grants may support a bounded offline allowance.
 
-### Registration acceptance criteria
-1. A fresh installation cannot open the main app before successful registration and email verification.
-2. A pending/unverified account cannot enter the app even if it restarts.
-3. Correct unexpired verification code activates the account; expired, reused or incorrect codes are rejected.
-4. Resend cooldown and attempt/rate limits are enforced server-side.
-5. A verified device is remembered securely and can launch offline to use local products, templates, design and printing.
-6. Sign out clears local trust; a later launch requires sign-in and online authorization.
-7. Password reset works through email and invalidates prior sessions as specified.
-8. Auth service outage does not prevent an already-authorized device from accessing local offline work.
-9. No product/label data or secrets are transmitted to the authentication service or embedded in the desktop binary.
-10. Worker/API tests cover registration, verification, expiration, replay, throttling, password hashing, session lifecycle and recovery.
+### Device identity and license activation
+- Generate a stable per-installation device ID and bind it to a privacy-preserving Windows device fingerprint. Do not transmit raw hardware serial numbers or sensitive hardware identifiers.
+- RSS Core records each activated device against the user/license and enforces the plan's device limit.
+- Single-PC license: one active PC device slot.
+- Multi-PC license: multiple device slots according to the purchased entitlement.
+- Device activation must support viewing device name/ID, last-seen time and deactivation from the account/device management UI.
+- Reinstall, hardware change, OS reset and device replacement need a documented recovery/deactivation process; do not silently create unlimited new device slots.
+- A device ID alone is not proof of license ownership. Use signed device-bound tokens and server-side activation records.
+
+### Multi-user / shared-user licensing
+- Support a license owner inviting additional RSS Core accounts as shared users, subject to the plan's shared-user seat count.
+- Shared users authenticate with their own verified RSS Core accounts. Never share one owner's password or license key as a common login.
+- RSS Core manages invitations, acceptance, removal, role/permission assignments and seat counts.
+- Shared-user access must be scoped to the licensed RSS Label Maker workspace/business and its permitted data. Define roles such as Owner/Admin, Editor and Print-only; permissions must be enforced by the app and RSS Core APIs where applicable.
+- Shared-user seats and PC device activations are separate entitlement counts. Do not treat one PC as one user or one user as one PC.
+
+### Offline policy
+- A device with a valid cached signed entitlement may continue permitted local work while offline, within a bounded offline grace period and cached daily quota.
+- New registration, email verification, first activation, license-key redemption, adding a device, inviting shared users, cloud backup/restore and license changes require online RSS Core access.
+- Offline usage must be recorded locally in a tamper-evident queue and reconciled with RSS Core on reconnection. Detect duplicate/replayed usage events.
+- An offline PC cannot immediately learn of a server-side revocation, seat removal or subscription expiry. Do not claim immediate offline revocation.
+- If the offline grace period or cached quota is exhausted, block only the restricted operations; preserve access to local data and allow viewing/exporting permitted local data as plan policy defines.
+- Do not silently erase or lock customer data when a license expires.
+
+### Google Drive backup and restore
+- Provide explicit Backup to Google Drive and Restore from Google Drive actions.
+- Use Google's supported OAuth 2.0 authorization flow with PKCE. Store refresh credentials securely using Windows Credential Manager/DPAPI; never embed a Google client secret in the desktop executable.
+- Store backups in a clearly named RSS Label Maker folder in the user's Google Drive (or a dedicated app-data location only if the user explicitly chooses that behavior). Do not access unrelated Drive files.
+- Back up the local application database, product records, templates, label designs, saved profiles where licensed, and referenced assets. Exclude passwords, RSS Core session tokens, license keys and Google OAuth secrets.
+- Encrypt backup archives before upload; use authenticated encryption and a key derived from a user-held recovery secret or securely managed key flow. Do not upload plaintext customer data.
+- Include backup version, application version, created timestamp, account/workspace ID and integrity hash. Validate integrity and compatibility before restore.
+- Restore must offer a preview/confirmation and create a local safety backup before replacing or merging existing data.
+- Support manual backup and restore first. Automatic/scheduled backup may be enabled only after the manual workflow is reliable.
+- Google Drive backup entitlement and storage/backup limits are controlled by RSS Core plan flags. Do not claim RSS Core stores the backup payload unless separately approved.
+
+### Security and API requirements
+- All authentication, email verification, license validation, device activation, seat management, quota checks, usage reconciliation and entitlement retrieval must go through RSS Core.
+- Desktop client stores only short-lived access credentials and a protected refresh/device credential; never store plaintext passwords or reusable bearer tokens in SQLite, logs or ordinary settings files.
+- Use TLS, strict request validation, signed short-lived access tokens, token rotation/revocation, rate limits, generic auth errors and audit logging.
+- Do not embed RSS Core secrets, Payments.lk credentials, Google client secrets or signing keys in the Windows binary.
+- RSS Core must enforce ownership and authorization for every user/license/device/seat operation. Never trust client-supplied plan names, quota values, device counts or feature flags.
+- API failures must not corrupt local data. Preserve bounded offline operation for already-authorized devices.
+
+### Acceptance criteria
+1. New users register and verify through RSS Core; user details appear in the RSS Core user database.
+2. No separate Label Maker account database or standalone auth Worker/D1 is used.
+3. Free plan is automatically assigned and its daily print quota is enforced.
+4. Free plan cannot export PDF or save reusable Import By / Distributed By master profiles.
+5. License key entry calls RSS Core and activates only a valid, eligible entitlement.
+6. Single-PC and multi-PC activation limits are enforced by RSS Core using stable device IDs.
+7. Shared users authenticate separately and consume authorized seat entitlements.
+8. Offline access follows signed entitlement, grace-period and cached-quota rules.
+9. Google Drive backup and restore use secure OAuth, encrypted archives and integrity validation.
+10. Existing local data is preserved across expiry, sign-out, network outage and restore failures.
+11. Payment fulfillment is based on verified Payments.lk webhook processing by RSS Core.
+12. Tests cover quota boundaries, day rollover, clock rollback, duplicate usage, key redemption, device replacement, seat removal, offline expiry and backup/restore integrity.
 
 ## 3. Product information model
 
@@ -92,7 +133,7 @@ When the English name changes, the application may offer an explicit Translate a
 - Warning (multiline).
 - Import By — selected from reusable saved company/person records.
 - Distributed By — selected from reusable saved company/person records.
-- Maintain Import By and Distributed By records in a dedicated **Import By & Distributed By** tab, with name and full address fields. Products can be assigned saved records; selecting a record automatically fills its name and address on the product. Allow product-level overrides without changing the saved master record.
+- Maintain Import By and Distributed By master records in a dedicated **Import By & Distributed By** tab for plans whose entitlement allows reusable profile saving. Free users cannot save reusable Import By / Distributed By master profiles. Products may retain product-specific importer/distributor text according to the Free plan feature policy.
 - Distributed By (company / person).
 - Pieces per Box (positive whole-number quantity).
 - Box Price (LKR / Rs.).
@@ -219,7 +260,7 @@ Required features:
 - Correct page breaks and multi-sheet output.
 - Actual-size / 100% output by default; never silently scale to fit.
 - Explicitly warn if printer driver settings may scale or clip output.
-- PDF export with correct page and label dimensions.
+- PDF export with correct page and label dimensions for plans whose RSS Core entitlement includes PDF export. Free users must not have PDF export.
 - Preserve Sinhala/Tamil glyph shaping and font appearance in PDF output; embed fonts where licensing permits or use a verified equivalent rendering approach.
 
 ## 10. Product management and bulk operations
@@ -231,7 +272,7 @@ Product management:
 - Reuse product records with different templates.
 
 Bulk import:
-- Excel and CSV import.
+- Excel and CSV import, subject to plan entitlements. Free-tier import restrictions must be explicitly defined in the plan matrix before release.
 - Column-to-field mapping.
 - Preview and validation before import.
 - Per-product copy quantities.
@@ -353,7 +394,7 @@ M4 — Custom dimensions, A4 layout engine and preview.
 M5 — Designer editing tools and barcode/QR.  
 M6 — Windows printing, calibration and PDF.  
 M7 — Excel/CSV bulk import.  
-M8 — Account registration, email verification, secure device authorization and offline session handling.
+M8 — RSS Core identity, license-key activation, quota enforcement, device licensing and shared-user access.\nM9 — Google Drive encrypted backup and restore.\nM10 — QA, installer, documentation and release.
 M9 — QA, installer, documentation and release.
 
 Do not mark a milestone complete without code, build/test evidence and functional verification. Do not deploy web services; this is a Windows desktop application.
