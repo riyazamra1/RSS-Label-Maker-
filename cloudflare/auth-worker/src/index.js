@@ -56,7 +56,8 @@ export default {
  async fetch(request,env) {
   if(request.method==="OPTIONS") return new Response(null,{status:204,headers:{"access-control-allow-origin":"*","access-control-allow-methods":"GET,POST,OPTIONS","access-control-allow-headers":"content-type,authorization"}});
   const url=new URL(request.url), path=url.pathname.replace(/\/$/,"")||"/";
-  if(request.method==="GET" && path==="/health") return json({ok:true,service:"rss-label-maker-auth"});
+  if(request.method==="GET" && path==="/health") return json({ok:true,service:"rss-label-maker-auth",configured:Boolean(env.DB&&env.CODE_PEPPER&&env.RESEND_API_KEY&&env.MAIL_FROM)});
+  if(!env.DB||!env.CODE_PEPPER||!env.RESEND_API_KEY||!env.MAIL_FROM) return json({error:"Authentication service configuration is incomplete."},503);
   if(request.method!=="POST") return json({error:"Not found"},404);
   let body; try { body=await request.json(); } catch { return json({error:"Invalid request"},400); }
   const ip=request.headers.get("cf-connecting-ip")||"unknown";
