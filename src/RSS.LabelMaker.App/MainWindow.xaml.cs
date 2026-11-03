@@ -330,7 +330,12 @@ public partial class MainWindow : Window
             {
                 _productStore.Update(product);
                 var index = _products.IndexOf(existing);
-                if (index >= 0) _products[index] = product;
+                _isLoadingProduct = true;
+                try
+                {
+                    if (index >= 0) _products[index] = product;
+                }
+                finally { _isLoadingProduct = false; }
                 ProductStatus.Text = $"Product '{product.English}' updated in Items Manager.";
             }
 
