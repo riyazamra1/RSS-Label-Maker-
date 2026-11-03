@@ -749,14 +749,14 @@ public partial class MainWindow : Window
             var height = (double)heightMm * mmToDip;
             var copies = int.TryParse(product.Copies, NumberStyles.None, CultureInfo.CurrentCulture, out var parsedCopies)
                 ? Math.Clamp(parsedCopies, 1, 500) : 1;
-            var watermark = _watermarkStore?.Load();
-            BitmapSource? watermarkImage = watermark?.Image is { Length: > 0 } bytes ? DecodeWatermark(bytes) : null;
+            var watermark = _watermarkStore?.Load() ?? (Image: (byte[]?)null, Opacity: 0d);
+            BitmapSource? watermarkImage = watermark.Image is { Length: > 0 } bytes ? DecodeWatermark(bytes) : null;
             var visual = new DrawingVisual();
             using (var dc = visual.RenderOpen())
             {
                 dc.DrawRectangle(Brushes.White, new Pen(Brushes.Black, 0.7), new Rect(0, 0, width, height));
                 var pad = Math.Max(5d, Math.Min(width, height) * 0.045d);
-                if (watermarkImage is not null && watermark?.Opacity > 0)
+                if (watermarkImage is not null && watermark.Opacity > 0)
                 {
                     var imageRect = new Rect(pad, pad, Math.Max(1, width - 2 * pad), Math.Max(1, height - 2 * pad));
                     dc.PushOpacity(Math.Clamp(watermark.Opacity, 0d, 1d));
