@@ -139,6 +139,11 @@ public partial class MainWindow : Window
             Fat = Fat.Text.Trim(),
             Mrp = Mrp.Text.Trim(),
             Importer = Importer.Text.Trim(),
+            PiecesPerBox = PiecesPerBox.Text.Trim(),
+            BoxPrice = BoxPrice.Text.Trim(),
+            ShowPerPiecePrice = ShowPerPiecePrice.IsChecked == true,
+            PerPiecePricingMode = PerPiecePricingMode.SelectedIndex == 1 ? "Manual" : "Automatic",
+            ManualPerPiecePrice = ManualPerPiecePrice.Text.Trim(),
             Copies = string.IsNullOrWhiteSpace(Copies.Text) ? "1" : Copies.Text.Trim()
         };
 
@@ -193,6 +198,12 @@ public partial class MainWindow : Window
         Fat.Text = product.Fat;
         Mrp.Text = product.Mrp;
         Importer.Text = product.Importer;
+        PiecesPerBox.Text = product.PiecesPerBox;
+        BoxPrice.Text = product.BoxPrice;
+        ShowPerPiecePrice.IsChecked = product.ShowPerPiecePrice;
+        PerPiecePricingMode.SelectedIndex = product.PerPiecePricingMode == "Manual" ? 1 : 0;
+        ManualPerPiecePrice.Text = product.ManualPerPiecePrice;
+        UpdatePerPiecePrice();
         Copies.Text = product.Copies;
         SaveProductButton.Content = "Update Product";
         ProductStatus.Text = $"Editing: {product.English}. Change the fields and click Update Product.";
@@ -350,7 +361,40 @@ public partial class MainWindow : Window
         return image;
     }
 
-    private void ProductField_TextChanged(object sender, TextChangedEventArgs e) => UpdatePreview();
+    private void ProductField_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        UpdatePerPiecePrice();
+        UpdatePreview();
+    }
+
+    private void PerPiecePricing_Changed(object sender, RoutedEventArgs e) => UpdatePerPiecePrice();
+
+    private void UpdatePerPiecePrice()
+    {
+        if (PerPiecePricePanel is null || ShowPerPiecePrice is null)
+            return;
+
+        var enabled = ShowPerPiecePrice.IsChecked == true;
+        PerPiecePricePanel.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
+        if (PerPiecePricingMode is null || ManualPerPiecePrice is null || CalculatedPerPiecePrice is null)
+            return;
+
+        var manual = PerPiecePricingMode.SelectedIndex == 1;
+        ManualPerPiecePrice.Visibility = manual ? Visibility.Visible : Visibility.Collapsed;
+        CalculatedPerPiecePrice.Visibility = manual ? Visibility.Collapsed : Visibility.Visible;
+
+        if (!manual &&
+            decimal.TryParse(BoxPrice.Text, NumberStyles.Number, CultureInfo.CurrentCulture, out var boxPrice) &&
+            int.TryParse(PiecesPerBox.Text, NumberStyles.None, CultureInfo.CurrentCulture, out var pieces) &&
+            pieces > 0 && boxPrice >= 0)
+        {
+            CalculatedPerPiecePrice.Text = (boxPrice / pieces).ToString("0.00", CultureInfo.CurrentCulture);
+        }
+        else if (!manual)
+        {
+            CalculatedPerPiecePrice.Text = "Enter a valid box price and pieces per box.";
+        }
+    }
 
     private void PrintOnPack_Changed(object sender, RoutedEventArgs e) => UpdatePreview();
 
@@ -368,6 +412,14 @@ public partial class MainWindow : Window
         PreviewBatch.Text = FormatPreviewRow("B.No", Batch.Text, BatchPrintOnPack.IsChecked == true);
         PreviewNetWeight.Text = FormatPreviewRow("N.Wt", NetWeight.Text, NetWeightPrintOnPack.IsChecked == true);
         PreviewMrp.Text = $"M.R.P. (Rs.)  {(string.IsNullOrWhiteSpace(Mrp.Text) ? "—" : Mrp.Text.Trim())}";
+        if (PreviewPerPiece is not null)
+        {
+            var perPiece = GetPerPiecePriceText();
+            PreviewPerPiece.Text = ShowPerPiecePrice.IsChecked == true && perPiece.Length > 0
+                ? $"Per Piece (Rs.)  {perPiece}"
+                : "";
+            PreviewPerPiece.Visibility = PreviewPerPiece.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
         PreviewSugar.Text = $"{DisplayNutrition(Sugar.Text)} g/100g";
         PreviewSalt.Text = $"{DisplayNutrition(Salt.Text)} g/100g";
         PreviewFat.Text = $"{DisplayNutrition(Fat.Text)} g/100g";
@@ -379,6 +431,19 @@ public partial class MainWindow : Window
             ? "Printed on Pack"
             : string.IsNullOrWhiteSpace(value) ? "—" : value.Trim();
         return $"{label} :  {display}";
+    }
+
+    private string GetPerPiecePriceText()
+    {
+        if (PerPiecePricingMode.SelectedIndex == 1)
+            return ManualPerPiecePrice.Text.Trim();
+
+        if (decimal.TryParse(BoxPrice.Text, NumberStyles.Number, CultureInfo.CurrentCulture, out var boxPrice) &&
+            int.TryParse(PiecesPerBox.Text, NumberStyles.None, CultureInfo.CurrentCulture, out var pieces) &&
+            pieces > 0 && boxPrice >= 0)
+            return (boxPrice / pieces).ToString("0.00", CultureInfo.CurrentCulture);
+
+        return "";
     }
 
     private static string DisplayNutrition(string value) =>
@@ -508,6 +573,11 @@ public partial class MainWindow : Window
         public string Fat { get; init; } = "";
         public string Mrp { get; init; } = "";
         public string Importer { get; init; } = "";
+        public string PiecesPerBox { get; init; } = "";
+        public string BoxPrice { get; init; } = "";
+        public bool ShowPerPiecePrice { get; init; }
+        public string PerPiecePricingMode { get; init; } = "Automatic";
+        public string ManualPerPiecePrice { get; init; } = "";
         public string Copies { get; init; } = "1";
     }
 
