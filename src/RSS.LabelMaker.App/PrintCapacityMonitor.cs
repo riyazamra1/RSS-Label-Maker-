@@ -13,6 +13,21 @@ public partial class MainWindow
 
     private void PrintCapacityInputs_Changed(object sender, RoutedEventArgs e)
     {
+        if (sender is CheckBox { Name: "EnableMultipleLabels", IsChecked: false })
+        {
+            var firstSelected = _products.FirstOrDefault(p => p.IsPrintSelected);
+            _updatingPrintSelection = true;
+            try
+            {
+                foreach (var product in _products)
+                    product.IsPrintSelected = ReferenceEquals(product, firstSelected);
+                PrintProductsList.Items.Refresh();
+            }
+            finally
+            {
+                _updatingPrintSelection = false;
+            }
+        }
         UpdatePrintCapacityMonitor();
     }
 
