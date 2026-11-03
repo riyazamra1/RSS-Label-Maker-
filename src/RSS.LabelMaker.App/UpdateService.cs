@@ -28,7 +28,8 @@ internal static class UpdateService
         var tag = root.GetProperty("tag_name").GetString()?.TrimStart('v', 'V');
         if (!Version.TryParse(tag, out var latest)) return null;
 
-        var current = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version ?? new Version(1, 0, 0);
+        latest = new Version(latest.Major, latest.Minor, Math.Max(0, latest.Build), Math.Max(0, latest.Revision));
+        var current = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version ?? new Version(1, 0, 0, 0);
         if (latest <= current) return null;
 
         var assets = root.GetProperty("assets").EnumerateArray()
@@ -54,7 +55,8 @@ internal static class UpdateService
         if (string.IsNullOrWhiteSpace(expectedHash) || expectedHash.Length != 64)
             throw new InvalidDataException("The release checksum file is invalid.");
 
-        var actualHash = Convert.ToHexString(await SHA256.HashDataAsync(File.OpenRead(packagePath), cancellationToken));
+        await using var packageStream = File.OpenRead(packagePath);
+        var actualHash = Convert.ToHexString(await SHA256.HashDataAsync(packageStream, cancellationToken));
         if (!CryptographicOperations.FixedTimeEquals(
                 Convert.FromHexString(expectedHash), Convert.FromHexString(actualHash)))
             throw new InvalidDataException("The downloaded update failed SHA-256 integrity verification.");
