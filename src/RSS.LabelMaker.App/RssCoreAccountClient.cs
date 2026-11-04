@@ -8,7 +8,9 @@ using System.Text.Json;
 
 namespace RSS.LabelMaker.App;
 
-internal sealed record RssCloudBackup(string Id, string FileName, long SizeBytes, string Sha256, DateTimeOffset CreatedAt);\n\ninternal sealed record RssAccountSession(string Id, string Email, string Name, string AppKey, string Plan, string LicenseStatus, string? ExpiresAt);
+internal sealed record RssCloudBackup(string Id, string FileName, long SizeBytes, string Sha256, DateTimeOffset CreatedAt);
+
+internal sealed record RssAccountSession(string Id, string Email, string Name, string AppKey, string Plan, string LicenseStatus, string? ExpiresAt);
 
 internal static class RssCoreAccountClient
 {
