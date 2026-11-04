@@ -960,18 +960,84 @@ public partial class MainWindow : Window
         {
             PrinterList.Items.Clear();
             using var server = new LocalPrintServer();
-            foreach (var queue in server.GetPrintQueues())
-                PrinterList.Items.Add(queue.Name);
+            // Include both local queues (USB and TCP/IP) and shared Windows connections.
+            var queues = server.GetPrintQueues(new[]
+            {
+                EnumeratedPrintQueueTypes.Local,
+                EnumeratedPrintQueueTypes.Connections
+            });
+            foreach (var queue in queues)
+            {
+                try
+                {
+                    queue.Refresh();
+                    var connectionType = queue.Name.Contains('\\') ? "Shared network" : "Local / TCP-IP";
+                    PrinterList.Items.Add(new PrinterOption(queue.Name, connectionType,
+                        queue.QueueStatus.ToString(), queue.IsOffline));
+                }
+                catch
+                {
+                    PrinterList.Items.Add(new PrinterOption(queue.Name, "Windows installed", "Status unavailable", false));
+                }
+            }
+
             if (PrinterList.Items.Count > 0)
                 PrinterList.SelectedIndex = 0;
+
             PrintStatus.Text = PrinterList.Items.Count == 0
-                ? "No installed printer was found. Connect or install a Windows printer."
-                : $"{PrinterList.Items.Count} installed printer(s) detected.";
+                ? "No installed printer queue was found. Add the printer in Windows, or use Add a network printer below."
+                : $"Found {PrinterList.Items.Count} printer queue(s), including shared network connections and TCP/IP printers installed in Windows.";
         }
         catch (Exception ex)
         {
             PrintStatus.Text = $"Could not read Windows printers: {ex.Message}";
         }
+    }
+
+    private void AddNetworkPrinter_Click(object sender, RoutedEventArgs e)
+    {
+        var address = NetworkPrinterAddress.Text.Trim();
+        if (string.IsNullOrWhiteSpace(address))
+        {
+            PrintStatus.Text = @"Enter a shared path (\\server\printer), IP address or hostname.";
+            NetworkPrinterAddress.Focus();
+            return;
+        }
+
+        try
+        {
+            if (address.StartsWith(@"\\", StringComparison.Ordinal))
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "rundll32.exe",
+                    Arguments = $"printui.dll,PrintUIEntry /in /n \"{address}\"",
+                    UseShellExecute = true
+                });
+                PrintStatus.Text = "Windows is connecting to the shared printer. Complete any Windows prompts, then refresh the printer list.";
+                return;
+            }
+
+            // The native Windows TCP/IP printer wizard performs driver selection and
+            // port installation. Copy the entered host/IP so it can be pasted there.
+            Clipboard.SetText(address);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "rundll32.exe",
+                Arguments = "printui.dll,PrintUIEntry /il",
+                UseShellExecute = true
+            });
+            PrintStatus.Text = $"Windows Add Printer wizard opened. Choose the TCP/IP address or hostname option; {address} is copied and ready to paste. Refresh the list after Windows installs it.";
+        }
+        catch (Exception ex)
+        {
+            PrintStatus.Text = $"Could not open Windows printer setup: {ex.Message}";
+        }
+    }
+
+    private sealed record PrinterOption(string QueueName, string ConnectionType, string Status, bool IsOffline)
+    {
+        public string DisplayName => $"{QueueName}  ·  {ConnectionType}  ·  {(IsOffline ? "Offline" : Status)}";
     }
 
     private void TestPrint_Click(object sender, RoutedEventArgs e)
