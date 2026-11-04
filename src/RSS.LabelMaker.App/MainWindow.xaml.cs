@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 
 namespace RSS.LabelMaker.App;
@@ -35,6 +36,7 @@ public partial class MainWindow : Window
     private TextBox? _minimumFontSize;
     private TextBox? _maximumFontSize;
     private CheckBox? _automaticUpdates;
+    private ComboBox? _labelResolution;
     private TextBlock? _updateStatus;
     private Button? _accountButton;
 
@@ -44,6 +46,7 @@ public partial class MainWindow : Window
         ProductsGrid.ItemsSource = _products;
         InitializeProductDatabase();
         LoadProducts();
+        AutomaticBackupSyncService.Start(GetDatabasePath(), message => Dispatcher.InvokeAsync(() => ProductStatus.Text = message));
         RefreshPrinters();
         ShowPage("Dashboard");
         BuildClockAndSettingsUi();
@@ -66,6 +69,7 @@ public partial class MainWindow : Window
             SaveSessionSnapshot();
             _clockTimer.Stop();
             _sessionTimer.Stop();
+            AutomaticBackupSyncService.Stop();
         };
     }
 
@@ -96,7 +100,7 @@ public partial class MainWindow : Window
                     _accountButton.Click += async (_, _) =>
                     {
                         var account = new AccountWindow { Owner = this };
-                        account.ShowDialog();
+                        if (account.ShowDialog() == true) LoadProducts();
                         await RefreshAccountButtonAsync();
                     };
                     existingRightPanel.Children.Insert(0, _accountButton);
@@ -309,6 +313,36 @@ public partial class MainWindow : Window
         designerPanel.Children.Add(new Separator { Margin = new Thickness(0, 14, 0, 12) });
         designerPanel.Children.Add(new TextBlock
         {
+            Text = "LABEL DOCUMENT RESOLUTION",
+            FontWeight = FontWeights.Bold,
+            FontSize = 11,
+            Foreground = Brush("#77808C"),
+            Margin = new Thickness(0, 0, 0, 6)
+        });
+        _labelResolution = new ComboBox
+        {
+            ItemsSource = new[] { "300 DPI", "600 DPI", "720 DPI" },
+            SelectedItem = "300 DPI",
+            Margin = new Thickness(0, 4, 0, 6),
+            Padding = new Thickness(8, 6, 8, 6),
+            ToolTip = "Resolution metadata for this label document. The physical print renderer must honor this value."
+        };
+        _labelResolution.SelectionChanged += (_, _) =>
+        {
+            if (!_isRestoringSession && _labelResolution.SelectedItem is not null)
+                SaveSettingsSilently();
+        };
+        designerPanel.Children.Add(_labelResolution);
+        designerPanel.Children.Add(new TextBlock
+        {
+            Text = "Choose the document's target resolution. This preference is saved on this PC.",
+            TextWrapping = TextWrapping.Wrap,
+            FontSize = 10,
+            Foreground = Brush("#77808C"),
+            Margin = new Thickness(0, 0, 0, 8)
+        });
+        designerPanel.Children.Add(new TextBlock
+        {
             Text = "OPTIONAL ELEMENTS",
             FontWeight = FontWeights.Bold,
             FontSize = 11,
@@ -441,6 +475,7 @@ public partial class MainWindow : Window
         if (_barcodeEnabled is not null) _barcodeEnabled.IsChecked = _settings.BarcodeEnabled;
         if (_qrEnabled is not null) _qrEnabled.IsChecked = _settings.QrEnabled;
         if (_automaticUpdates is not null) _automaticUpdates.IsChecked = _settings.AutomaticUpdatesEnabled;
+        if (_labelResolution is not null) _labelResolution.SelectedItem = $"{NormalizeDocumentDpi(_settings.DocumentDpi)} DPI";
     }
 
     private void SaveSettings_Click(object sender, RoutedEventArgs e) => SaveSettingsSilently();
@@ -462,6 +497,8 @@ public partial class MainWindow : Window
             _settings.BarcodeEnabled = _barcodeEnabled?.IsChecked == true;
             _settings.QrEnabled = _qrEnabled?.IsChecked == true;
             _settings.AutomaticUpdatesEnabled = _automaticUpdates?.IsChecked != false;
+            _settings.DocumentDpi = _labelResolution?.SelectedItem is string dpiText && int.TryParse(dpiText.Replace(" DPI", "", StringComparison.Ordinal), out var dpi)
+                ? NormalizeDocumentDpi(dpi) : NormalizeDocumentDpi(_settings.DocumentDpi);
 
             if (_settings.MinimumFontSize <= 0 || _settings.MaximumFontSize < _settings.MinimumFontSize)
                 throw new InvalidOperationException("Maximum font size must be greater than or equal to the positive minimum font size.");
@@ -549,6 +586,8 @@ public partial class MainWindow : Window
         _clockTime.Visibility = _settings.ShowTime ? Visibility.Visible : Visibility.Collapsed;
         _clockDay.Visibility = _settings.ShowDayName ? Visibility.Visible : Visibility.Collapsed;
     }
+
+    private static int NormalizeDocumentDpi(int dpi) => dpi is 300 or 600 or 720 ? dpi : 300;
 
     private static int ParseFontSize(string? value, int fallback) =>
         int.TryParse(value, out var parsed) ? parsed : fallback;
@@ -832,6 +871,7 @@ public partial class MainWindow : Window
             command.Parameters.AddWithValue("$printWeight", product.PrintNetWeight ? 1 : 0);
             command.Parameters.AddWithValue("$createdUtc", DateTimeOffset.UtcNow.ToString("O"));
             command.ExecuteNonQuery();
+            AutomaticBackupSyncService.MarkDatabaseChanged();
             _products.Add(product);
             ProductCount.Text = _products.Count.ToString();
             ProductStatus.Text = "Product saved to the local SQLite database.";
@@ -904,6 +944,7 @@ public partial class MainWindow : Window
 
     private void LoadProducts()
     {
+        _products.Clear();
         using var connection = new SqliteConnection($"Data Source={GetDatabasePath()}");
         connection.Open();
         using var command = connection.CreateCommand();
@@ -948,7 +989,8 @@ public partial class MainWindow : Window
             LayoutStatus.Text = $"A {width:0.##} × {height:0.##} mm label does not fit this sheet with 5 mm margins and 3 mm gaps.";
             return;
         }
-        LayoutStatus.Text = $"{LabelPaperSize.Text} · {columns} columns × {rows} rows · {columns * rows} labels/sheet. Geometry only; printer hardware margins are not yet checked.";
+        var dpi = NormalizeDocumentDpi(_settings.DocumentDpi);
+        LayoutStatus.Text = $"{LabelPaperSize.Text} · {columns} columns × {rows} rows · {columns * rows} labels/sheet · Document resolution: {dpi} DPI. Geometry only; printer hardware margins are not yet checked.";
     }
 
     private void RefreshPrinters_Click(object sender, RoutedEventArgs e) => RefreshPrinters();
@@ -959,13 +1001,33 @@ public partial class MainWindow : Window
         {
             PrinterList.Items.Clear();
             using var server = new LocalPrintServer();
-            foreach (var queue in server.GetPrintQueues())
-                PrinterList.Items.Add(queue.Name);
+            // Include both local queues (USB and TCP/IP) and shared Windows connections.
+            var queues = server.GetPrintQueues(new[]
+            {
+                EnumeratedPrintQueueTypes.Local,
+                EnumeratedPrintQueueTypes.Connections
+            });
+            foreach (var queue in queues)
+            {
+                try
+                {
+                    queue.Refresh();
+                    var connectionType = queue.Name.Contains('\\') ? "Shared network" : "Local / TCP-IP";
+                    PrinterList.Items.Add(new PrinterOption(queue.Name, connectionType,
+                        queue.QueueStatus.ToString(), queue.IsOffline));
+                }
+                catch
+                {
+                    PrinterList.Items.Add(new PrinterOption(queue.Name, "Windows installed", "Status unavailable", false));
+                }
+            }
+
             if (PrinterList.Items.Count > 0)
                 PrinterList.SelectedIndex = 0;
+
             PrintStatus.Text = PrinterList.Items.Count == 0
-                ? "No installed printer was found. Connect or install a Windows printer."
-                : $"{PrinterList.Items.Count} installed printer(s) detected.";
+                ? "No installed printer queue was found. Add the printer in Windows, or use Add a network printer below."
+                : $"Found {PrinterList.Items.Count} printer queue(s), including shared network connections and TCP/IP printers installed in Windows.";
         }
         catch (Exception ex)
         {
@@ -973,9 +1035,135 @@ public partial class MainWindow : Window
         }
     }
 
+    private void AddNetworkPrinter_Click(object sender, RoutedEventArgs e)
+    {
+        var address = NetworkPrinterAddress.Text.Trim();
+        if (string.IsNullOrWhiteSpace(address))
+        {
+            PrintStatus.Text = @"Enter a shared path (\\server\printer), IP address or hostname.";
+            NetworkPrinterAddress.Focus();
+            return;
+        }
+
+        try
+        {
+            if (address.StartsWith(@"\\", StringComparison.Ordinal))
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "rundll32.exe",
+                    Arguments = $"printui.dll,PrintUIEntry /in /n \"{address}\"",
+                    UseShellExecute = true
+                });
+                PrintStatus.Text = "Windows is connecting to the shared printer. Complete any Windows prompts, then refresh the printer list.";
+                return;
+            }
+
+            // The native Windows TCP/IP printer wizard performs driver selection and
+            // port installation. Copy the entered host/IP so it can be pasted there.
+            Clipboard.SetText(address);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "rundll32.exe",
+                Arguments = "printui.dll,PrintUIEntry /il",
+                UseShellExecute = true
+            });
+            PrintStatus.Text = $"Windows Add Printer wizard opened. Choose the TCP/IP address or hostname option; {address} is copied and ready to paste. Refresh the list after Windows installs it.";
+        }
+        catch (Exception ex)
+        {
+            PrintStatus.Text = $"Could not open Windows printer setup: {ex.Message}";
+        }
+    }
+
+    private sealed record PrinterOption(string QueueName, string ConnectionType, string Status, bool IsOffline)
+    {
+        public string DisplayName => $"{QueueName}  ·  {ConnectionType}  ·  {(IsOffline ? "Offline" : Status)}";
+    }
+
     private void TestPrint_Click(object sender, RoutedEventArgs e)
     {
-        PrintStatus.Text = "Printer discovery works. Actual-size label rendering and test-page printing are scheduled for the printing milestone.";
+        try
+        {
+            var dpi = NormalizeDocumentDpi(_settings.DocumentDpi);
+            var printDialog = new PrintDialog();
+            if (PrinterList.SelectedItem is PrinterOption selected)
+            {
+                using var server = new LocalPrintServer();
+                printDialog.PrintQueue = server.GetPrintQueue(selected.QueueName);
+            }
+
+            if (printDialog.ShowDialog() != true)
+            {
+                PrintStatus.Text = "Test print cancelled.";
+                return;
+            }
+
+            // A4 page in WPF device-independent units (1/96 inch), rasterized
+            // at the selected document DPI before being sent to the printer.
+            const double pageWidthMm = 210d;
+            const double pageHeightMm = 297d;
+            const double mmPerInch = 25.4d;
+            var pageWidthDip = pageWidthMm / mmPerInch * 96d;
+            var pageHeightDip = pageHeightMm / mmPerInch * 96d;
+            var pixelWidth = (int)Math.Round(pageWidthMm / mmPerInch * dpi);
+            var pixelHeight = (int)Math.Round(pageHeightMm / mmPerInch * dpi);
+
+            var drawing = new DrawingVisual();
+            using (var context = drawing.RenderOpen())
+            {
+                context.DrawRectangle(Brushes.White, null, new Rect(0, 0, pageWidthDip, pageHeightDip));
+                var margin = 18d / mmPerInch * 96d;
+                var pen = new Pen(Brushes.Black, 0.5);
+                context.DrawRectangle(null, pen, new Rect(margin, margin, pageWidthDip - margin * 2, pageHeightDip - margin * 2));
+
+                var title = new FormattedText(
+                    "RSS LABEL MAKER — DPI CALIBRATION",
+                    CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+                    new Typeface("Arial"), 18, Brushes.Black, 1.0);
+                context.DrawText(title, new Point(margin + 12, margin + 12));
+
+                var details = new FormattedText(
+                    $"Document resolution: {dpi} DPI\nPage: A4 · 210 × 297 mm\nPrinted: {DateTime.Now:yyyy-MM-dd HH:mm:ss}",
+                    CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+                    new Typeface("Arial"), 11, Brushes.Black, 1.0);
+                context.DrawText(details, new Point(margin + 12, margin + 48));
+
+                // The horizontal calibration rule is exactly 100 mm in page coordinates.
+                var calibrationY = margin + 125;
+                context.DrawLine(new Pen(Brushes.Black, 1), new Point(margin + 12, calibrationY),
+                    new Point(margin + 12 + 100d / mmPerInch * 96d, calibrationY));
+                context.DrawLine(new Pen(Brushes.Black, 1), new Point(margin + 12, calibrationY - 5),
+                    new Point(margin + 12, calibrationY + 5));
+                context.DrawLine(new Pen(Brushes.Black, 1), new Point(margin + 12 + 100d / mmPerInch * 96d, calibrationY - 5),
+                    new Point(margin + 12 + 100d / mmPerInch * 96d, calibrationY + 5));
+                var calibrationText = new FormattedText(
+                    "Calibration line: 100 mm (measure after printing)",
+                    CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+                    new Typeface("Arial"), 9, Brushes.Black, 1.0);
+                context.DrawText(calibrationText, new Point(margin + 12, calibrationY + 10));
+            }
+
+            var bitmap = new RenderTargetBitmap(pixelWidth, pixelHeight, dpi, dpi, PixelFormats.Pbgra32);
+            bitmap.Render(drawing);
+            bitmap.Freeze();
+
+            var pageImage = new System.Windows.Controls.Image
+            {
+                Source = bitmap,
+                Width = pageWidthDip,
+                Height = pageHeightDip,
+                Stretch = Stretch.Fill
+            };
+            printDialog.PrintVisual(pageImage, $"RSS Label Maker {dpi} DPI calibration page");
+            PrintStatus.Text = $"Sent A4 calibration page to {printDialog.PrintQueue.Name} at {dpi} DPI. Measure the printed 100 mm line to confirm the printer's actual-size setting.";
+        }
+        catch (Exception ex)
+        {
+            PrintStatus.Text = $"Test print failed: {ex.Message}";
+            MessageBox.Show(this, ex.Message, "RSS Label Maker — Print test failed",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private sealed class TimeZoneOption
@@ -1000,6 +1188,7 @@ public partial class MainWindow : Window
         public bool BarcodeEnabled { get; set; }
         public bool QrEnabled { get; set; }
         public bool AutomaticUpdatesEnabled { get; set; } = true;
+        public int DocumentDpi { get; set; } = 300;
     }
 
     private sealed class ProductRow

@@ -40,7 +40,7 @@ internal sealed class AccountWindow : Window
         card.Child = stack;
         stack.Children.Add(new TextBlock { Text = "RSS ACCOUNT", Foreground = Brush("#C69A43"), FontSize = 11, FontWeight = FontWeights.Bold });
         stack.Children.Add(new TextBlock { Text = "Sign in to your RSS account", Foreground = Brush("#20242B"), FontSize = 25, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 8, 0, 5) });
-        stack.Children.Add(new TextBlock { Text = "Cloud backup, restore and license management are linked to your RSS Core account. Label creation and printing remain available offline.", TextWrapping = TextWrapping.Wrap, Foreground = Brush("#77808C"), FontSize = 12, Margin = new Thickness(0, 0, 0, 20) });
+        stack.Children.Add(new TextBlock { Text = "Your RSS account and license are managed by RSS Core. Optional product database backups are stored in your own Google Drive. Label creation and printing remain available offline.", TextWrapping = TextWrapping.Wrap, Foreground = Brush("#77808C"), FontSize = 12, Margin = new Thickness(0, 0, 0, 20) });
         var tabs = new StackPanel { Orientation = Orientation.Horizontal };
         var login = new Button { Content = "Sign in", Padding = new Thickness(18, 8, 18, 8), Margin = new Thickness(0, 0, 8, 14), Background = Brush("#20242B"), Foreground = Brushes.White };
         var register = new Button { Content = "Create account", Padding = new Thickness(18, 8, 18, 8), Margin = new Thickness(0, 0, 0, 14), Background = Brush("#F0F1F3"), Foreground = Brush("#20242B") };
@@ -127,6 +127,13 @@ internal sealed class AccountWindow : Window
         stack.Children.Add(new TextBlock { Text = "LICENSE", FontSize = 10, FontWeight = FontWeights.Bold, Foreground = Brush("#98702B") });
         stack.Children.Add(new TextBlock { Text = $"{session.Plan} · {session.LicenseStatus}", FontSize = 14, Foreground = Brush("#20242B"), Margin = new Thickness(0, 5, 0, 3) });
         stack.Children.Add(new TextBlock { Text = session.ExpiresAt is null ? "No expiry date returned" : $"Expires: {session.ExpiresAt}", FontSize = 11, Foreground = Brush("#77808C") });
+        var cloud = new Button { Content = "Cloud backup & license", Height = 42, Margin = new Thickness(0, 20, 0, 0), Background = Brush("#C69A43"), Foreground = Brush("#20242B"), FontWeight = FontWeights.SemiBold };
+        cloud.Click += (_, _) =>
+        {
+            var services = new BackupLicenseWindow { Owner = this };
+            if (services.ShowDialog() == true) { DialogResult = true; Close(); }
+        };
+        stack.Children.Add(cloud);
         var signOut = new Button { Content = "Sign out", Height = 40, Margin = new Thickness(0, 28, 0, 0), Background = Brush("#20242B"), Foreground = Brushes.White };
         signOut.Click += async (_, _) => { await RssCoreAccountClient.SignOutAsync(); DialogResult = false; Close(); };
         stack.Children.Add(signOut);
