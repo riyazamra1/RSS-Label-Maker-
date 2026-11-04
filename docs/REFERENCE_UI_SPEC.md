@@ -1,6 +1,6 @@
 # RSS Label Maker — Reference UI and Workflow Specification
 
-Status: implementation specification for `feat/reference-faithful-label-designer`  
+Status: implementation specification for `feat/reference-faithful-label-designer`
 Primary visual reference: user-provided RSS Label Maker v1.0.0 screenshot in the project conversation.
 
 ## 1. Product direction
@@ -31,47 +31,96 @@ The Dashboard must contain these tabs and share one underlying label document/pr
 
 Changing data in any tab updates the same live label preview immediately.
 
-## 4. New-label setup sequence
+## 4. Units and measurement preferences
+
+- Provide a user-selectable measurement unit for label and custom paper dimensions: millimetres (mm), centimetres (cm), and inches (in).
+- Display and accept values in the selected unit throughout label setup and design properties.
+- Store/compute physical dimensions internally in a single canonical unit (millimetres) to avoid rounding drift; convert only for display/input.
+- Allow changing units without changing the physical size of an existing label or paper.
+- Nutrition quantity units are independently selectable per nutrition item. Provide the requested units: g, mg, and L. The chosen unit must appear consistently in the label preview, saved design, PDF and print output.
+- Keep numeric value and unit as separate data fields. A numeric value of zero is a valid entered value, not an empty field.
+
+## 5. New-label setup sequence
 
 Before creating the sheet preview, the user must set:
 
-1. Label width and height in millimetres.
+1. Label width and height.
 2. Paper size (A4, A5, Letter, and custom dimensions).
 3. Paper orientation (portrait or landscape).
-4. Target document/print resolution: 300, 600, or 720 DPI.
-5. Sheet margins and horizontal/vertical label gaps; allow manual rows/columns as an override.
+4. Target document/print resolution (DPI).
+5. Sheet margins and horizontal/vertical label gaps.
 
-Calculate the maximum labels per sheet from the usable printable area and label dimensions. Use:
-- columns = floor((printable width + horizontal gap) / (label width + horizontal gap))
-- rows = floor((printable height + vertical gap) / (label height + vertical gap))
+- Include common DPI presets (300, 600, 720), but also allow the user to type a custom positive integer DPI manually.
+- Validate manually entered DPI and show a clear validation error for zero, negative, non-integer or unsupported values. Do not silently replace a custom value with 300.
+- Margins must be individually customizable for top, bottom, left and right. Horizontal and vertical gaps must also be customizable.
+- Provide printer-derived hardware printable-area information when available. Distinguish hardware-unprintable margins from user-configured sheet margins so the effective printable area is clear.
+- If printer information is unavailable, clearly identify the assumed printable area and allow manual configuration.
+- Label size remains editable while in Label Design. Changing label width or height immediately updates the design canvas physical bounds, sheet preview, and labels-per-page calculation. Warn before destructive clipping/reflow; do not silently distort existing elements.
+- Recalculate automatically whenever label size, paper, orientation, unit, resolution, printer, margins or gaps change.
+
+## 6. Maximum labels per page calculation
+
+The application must always automatically fit the **maximum possible whole labels** on the selected page within the effective printable area. Do not leave avoidable unused rows or columns and do not default to a smaller fixed label count.
+
+For a given orientation and placement:
+- columns = floor((usable width + horizontal gap) / (label width + horizontal gap))
+- rows = floor((usable height + vertical gap) / (label height + vertical gap))
 - labels per sheet = columns × rows
 
-Use the selected printer's reported printable area/hardware margins when available. If unavailable, clearly identify the assumed margins and allow the user to configure them. Never silently clip labels. Recalculate when label size, paper, orientation, printer, margins, gaps or layout changes.
+Evaluate both row/column orientations where rotation is permitted by the label design and printer, and choose the valid arrangement producing the greatest whole-label count. Do not rotate a label design without user permission if rotation changes its intended orientation. If both arrangements produce the same count, prefer the one preserving the design's current orientation.
 
-## 5. Nutrition visibility
+- Usable page area accounts for paper dimensions, printer hardware limits, configured margins and gaps.
+- Show calculated rows, columns, total labels per sheet, remaining space and any unused area.
+- Recalculate live after any relevant setting changes.
+- Never overlap or clip labels. If even one label cannot fit, explain why and show the required printable area.
+- The print preview must show every calculated label at the correct physical size and position.
+
+## 7. Nutrition visibility and units
 
 Sugar, Salt and Fat are independent optional elements:
-- Empty field means its corresponding panel is hidden.
-- Non-empty field means its corresponding panel is shown.
-- If all three are empty, hide the complete nutrition section and reclaim its layout space.
+- Empty/unentered field means its corresponding panel is hidden.
+- Any explicitly entered numeric value, including **0**, means its corresponding panel is shown (for example, 0 g must display the panel).
+- If all three are empty/unentered, hide the complete nutrition section and reclaim its layout space.
 - If only one or two are populated, show only those panels and distribute them evenly.
-- Do not print blank panels, placeholder values, or empty nutrition headings.
+- Each nutrition item has its own selectable unit (g, mg, L); render the value and selected unit together.
+- Do not treat zero as empty, and do not print blank panels, placeholder values, or empty nutrition headings.
 
-## 6. Live preview and design document
+## 8. Products and SKU management
+
+The Products page must provide a proper saved-product list view with search/filter and row actions:
+- Create and save products.
+- Edit an existing product and persist changes to the same product record.
+- Delete a product with a clear confirmation.
+- Duplicate a product into a new record without overwriting the original.
+- Automatically generate a unique SKU when a product is created. SKU generation must be collision-safe and persist the SKU in SQLite. The user may view/copy the SKU; do not regenerate it when editing an existing product.
+- Ensure duplicate-product workflow generates a new SKU for the duplicated record.
+- Preserve existing product records during schema migration; never discard or reset the existing SQLite database.
+
+## 9. Excel import and export
+
+- Export saved products to an Excel spreadsheet (.xlsx), including SKU and all supported product fields.
+- Import products from an Excel spreadsheet (.xlsx) using a clear column/header mapping and a preview before writing to the database.
+- Validate required fields and data types; report invalid rows with row numbers and reasons.
+- Detect duplicate SKUs and provide an explicit safe resolution (skip, update matching product, or import as a new product with a newly generated SKU). Never silently overwrite records.
+- Show import summary (added, updated, skipped, failed) and preserve the original workbook.
+- Excel import/export must operate on product data, not flatten or lose multilingual text.
+
+## 10. Live preview and design document
 
 The label preview must render the same document model used by print/PDF output. It must not be a static mock-up assembled from fixed text blocks. Support selecting an element and editing its properties; preserve element positions and style when saving and reopening templates. Canvas display zoom must not alter physical output dimensions.
 
-## 7. Export and print
+## 11. Export and print
 
+- Dedicated print preview for the complete paper sheet, including all calculated labels.
 - Actual-size print output (100% scale) with explicit user-selected fit-to-page only if offered as a separate mode.
-- A4/A5/custom sheet preview with calculated repeated labels.
+- A4/A5/custom sheet preview with automatically maximized repeated labels.
 - PDF export must use the same layout engine as printing.
-- Excel export for product data.
+- Excel export/import for product data as specified above.
 - Printer selection must include Windows-installed USB and network printers.
 - Respect target DPI in rasterized content and preserve vector text/shapes where possible.
 - Provide printer calibration and a test print workflow.
 
-## 8. Preserve existing functionality
+## 12. Preserve existing functionality
 
 Do not regress:
 - SQLite product persistence and existing data.
@@ -82,16 +131,23 @@ Do not regress:
 - English-to-Sinhala/Tamil automatic transliteration entitlement: five free uses, then Premium; manual local-language entry remains free and offline.
 - Existing installer/update flow.
 
-## 9. Acceptance criteria
+## 13. Acceptance criteria
 
 The redesign is not complete until:
 - The main Dashboard visually follows the supplied screenshot's composition and hierarchy.
 - Users can enter all product/company details from Dashboard tabs without navigating away.
 - Every input updates the live preview.
-- Users can select, move, resize, format, reorder, duplicate and delete label elements.
-- Label dimensions, paper, orientation, resolution, margins and gaps drive accurate sheet calculations.
-- The sheet preview shows the correct row/column count and total labels.
-- Empty nutrition fields hide their corresponding panels; all-empty hides the nutrition section.
+- Units can be changed without changing the underlying physical dimensions.
+- Users can customize all four sheet margins and horizontal/vertical gaps.
+- Users can type a custom DPI value as well as select the 300/600/720 presets.
+- Label size can be changed during design and the canvas and print calculations update immediately.
+- The sheet layout automatically selects the maximum valid number of labels per page.
+- Print preview displays the complete calculated page accurately.
+- Zero-valued nutrition fields remain visible; unentered fields are hidden; all-unentered hides the nutrition section.
+- Nutrition units are independently selectable and saved.
+- Saved products can be edited, deleted and duplicated.
+- Every newly created or duplicated product receives a unique automatically generated SKU.
+- Product Excel import/export works with preview, validation and duplicate handling.
 - Saved designs reopen correctly.
 - PDF and printer output match the same physical layout at actual size.
 - Existing account, database, backup, licensing and update functions continue to work.
