@@ -100,7 +100,7 @@ internal static class RssCoreAccountClient
 
     public static async Task<RssAccountSession> GetLicenseAsync()
     {
-        using var response = await SendAuthenticatedAsync(HttpMethod.Get, LicenseApi);
+        using var response = await SendAuthenticatedAsync(HttpMethod.Get, ApiBase + "me");
         using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
         EnsureSuccess(response, document.RootElement, "Unable to load license information.");
         return ReadSession(document.RootElement);
