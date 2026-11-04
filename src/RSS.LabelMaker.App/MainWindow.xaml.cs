@@ -232,7 +232,7 @@ public partial class MainWindow : Window
             _automaticUpdates, _updateStatus, checkNow,
             new TextBlock
             {
-                Text = "Updates are downloaded only from the RSS Label Maker GitHub Releases page. A separate updater replaces the application and restarts it. Internet access is required; offline label work remains available.",
+                Text = "Updates are securely checked and installed in the background. The application restarts automatically and restores your last saved working session. Internet access is required for updates; offline label work remains available.",
                 TextWrapping = TextWrapping.Wrap,
                 FontSize = 10,
                 Foreground = Brush("#77808C")
@@ -516,9 +516,9 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            if (_updateStatus is not null) _updateStatus.Text = "Update check/install was not completed: " + ex.Message;
+            if (_updateStatus is not null) _updateStatus.Text = "The update could not be completed. Your current installation was not intentionally changed. Check your internet connection and try again.";
             if (userRequested)
-                MessageBox.Show(this, ex.Message, "RSS Label Maker update", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(this, "The update could not be completed. Check your internet connection and try again.", "RSS Label Maker update", MessageBoxButton.OK, MessageBoxImage.Warning);
             System.Diagnostics.Debug.WriteLine("RLM update failed: " + ex);
         }
     }
