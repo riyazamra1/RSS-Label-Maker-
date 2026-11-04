@@ -1,39 +1,37 @@
 name: Windows x64 Build
-
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
-
 permissions:
   contents: read
-
 jobs:
   build-windows:
-    name: Build RSS Label Maker (Windows x64)
+    name: Build and package RSS Label Maker (Windows x64)
     runs-on: windows-latest
-    timeout-minutes: 30
-
+    timeout-minutes: 40
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
-
       - name: Set up .NET 10 SDK
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-
+      - name: Set build version
+        shell: pwsh
+        run: |
+          $version = '1.0.0'
+          $fileVersion = '1.0.0.0'
+          "RLM_VERSION=$version" >> $env:GITHUB_ENV
+          "RLM_FILE_VERSION=$fileVersion" >> $env:GITHUB_ENV
       - name: Show .NET SDK
         run: dotnet --info
-
       - name: Restore dependencies
-        run: dotnet restore .\\RSS.LabelMaker.sln -r win-x64
-
+        run: dotnet restore .\RSS.LabelMaker.sln -r win-x64
       - name: Build Release
         run: dotnet build .\RSS.LabelMaker.sln -c Release --no-restore
-
       - name: Publish self-contained Windows x64 executable
         run: >-
           dotnet publish .\src\RSS.LabelMaker.App\RSS.LabelMaker.App.csproj
@@ -41,26 +39,44 @@ jobs:
           -r win-x64
           --self-contained true
           --no-restore
+          -p:Version=$env:RLM_VERSION
+          -p:AssemblyVersion=$env:RLM_FILE_VERSION
+          -p:FileVersion=$env:RLM_FILE_VERSION
           -p:PublishSingleFile=true
           -p:IncludeNativeLibrariesForSelfExtract=true
           -p:DebugType=None
           -p:DebugSymbols=false
           -o .\artifacts\publish
-
       - name: Verify published executable
         shell: pwsh
         run: |
           $exe = ".\artifacts\publish\RSS.LabelMaker.exe"
-          if (!(Test-Path $exe)) {
-            throw "Expected executable was not produced: $exe"
-          }
+          if (!(Test-Path $exe)) { throw "Expected executable was not produced: $exe" }
           Get-Item $exe | Format-List Name,Length,LastWriteTime
-          Get-ChildItem .\artifacts\publish | Select-Object Name,Length
-
-      - name: Upload Windows x64 build
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          if (!(Test-Path $iscc)) { throw "Inno Setup compiler was not installed." }
+          "ISCC_PATH=$iscc" >> $env:GITHUB_ENV
+      - name: Compile Windows installer
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force .\artifacts\installer | Out-Null
+          & "$env:ISCC_PATH" "/DAppVersion=$env:RLM_VERSION" "/DAppFileVersion=$env:RLM_FILE_VERSION" "/DAppExeSource=$PWD\artifacts\publish\RSS.LabelMaker.exe" .\installer\RSS-Label-Maker.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup compilation failed." }
+          $setup = ".\artifacts\installer\RSS-Label-Maker-Setup.exe"
+          if (!(Test-Path $setup)) { throw "Installer output was not produced." }
+          $hash = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  RSS-Label-Maker-Setup.exe" | Set-Content "$setup.sha256" -NoNewline
+      - name: Upload Windows installer and executable
         uses: actions/upload-artifact@v4
         with:
-          name: RSS-Label-Maker-Windows-x64
-          path: .\artifacts\publish\
+          name: RSS-Label-Maker-Windows-x64-Installer
+          path: |
+            .\artifacts\publish\RSS.LabelMaker.exe
+            .\artifacts\installer\RSS-Label-Maker-Setup.exe
+            .\artifacts\installer\RSS-Label-Maker-Setup.exe.sha256
           if-no-files-found: error
           retention-days: 14
