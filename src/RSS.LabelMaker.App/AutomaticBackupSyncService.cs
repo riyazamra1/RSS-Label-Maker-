@@ -99,6 +99,16 @@ internal static class AutomaticBackupSyncService
                 }
 
                 if (databasePath is null) continue;
+
+                // Cloud backup is an RSS account feature. Keep the pending marker while
+                // signed out, and never upload using Google Drive authorization alone.
+                var rssSession = await RssCoreAccountClient.GetSessionAsync();
+                if (rssSession is null)
+                {
+                    Publish("Automatic backup is paused. Sign in to your RSS account to resume Google Drive sync. Local data remains saved on this PC.");
+                    continue;
+                }
+
                 if (!GoogleDriveBackupClient.IsConfigured || !GoogleDriveBackupClient.HasSavedAuthorization)
                 {
                     Publish("Automatic backup is waiting for Google Drive setup/sign-in. Local data remains saved on this PC.");
