@@ -3,6 +3,7 @@ using System.IO;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace RSS.LabelMaker.App;
 
@@ -28,6 +29,9 @@ internal static class UpdateService
         using var release = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
         var root = release.RootElement;
         var releaseNotes = root.TryGetProperty("body", out var bodyElement) ? bodyElement.GetString() ?? "" : "";
+        // Never surface repository/provider URLs or provider branding inside the application.
+        releaseNotes = Regex.Replace(releaseNotes, @"(?im)^.*(?:github\\.com|githubusercontent\\.com).*$", "").Trim();
+        releaseNotes = Regex.Replace(releaseNotes, @"https?://\\S+", "[external link omitted]");
         var tag = root.GetProperty("tag_name").GetString()?.TrimStart('v', 'V');
         if (!Version.TryParse(tag, out var latest)) return null;
 
@@ -142,8 +146,14 @@ $workDir = Join-Path $env:LOCALAPPDATA 'Razeen Secure Solution\RSS Label Maker\u
 $backupPath = Join-Path $workDir ($exeName + '.previous')
 New-Item -ItemType Directory -Force -Path $workDir | Out-Null
 try {
-    Wait-Process -Id $ParentPid -Timeout 120
-} catch {}
+    Wait-Process -Id $ParentPid -Timeout 120 -ErrorAction Stop
+} catch {
+    # Never replace an executable while its original process may still be running.
+    exit 2
+}
+if (Get-Process -Id $ParentPid -ErrorAction SilentlyContinue) {
+    exit 2
+}
 try {
     if (Test-Path $backupPath) { Remove-Item $backupPath -Force }
     Expand-Archive -LiteralPath $PackagePath -DestinationPath $workDir -Force
