@@ -35,6 +35,7 @@ public partial class MainWindow : Window
     private TextBox? _minimumFontSize;
     private TextBox? _maximumFontSize;
     private CheckBox? _automaticUpdates;
+    private ComboBox? _labelResolution;
     private TextBlock? _updateStatus;
     private Button? _accountButton;
 
@@ -311,6 +312,36 @@ public partial class MainWindow : Window
         designerPanel.Children.Add(new Separator { Margin = new Thickness(0, 14, 0, 12) });
         designerPanel.Children.Add(new TextBlock
         {
+            Text = "LABEL DOCUMENT RESOLUTION",
+            FontWeight = FontWeights.Bold,
+            FontSize = 11,
+            Foreground = Brush("#77808C"),
+            Margin = new Thickness(0, 0, 0, 6)
+        });
+        _labelResolution = new ComboBox
+        {
+            ItemsSource = new[] { "300 DPI", "600 DPI", "720 DPI" },
+            SelectedItem = "300 DPI",
+            Margin = new Thickness(0, 4, 0, 6),
+            Padding = new Thickness(8, 6, 8, 6),
+            ToolTip = "Resolution metadata for this label document. The physical print renderer must honor this value."
+        };
+        _labelResolution.SelectionChanged += (_, _) =>
+        {
+            if (!_isRestoringSession && _labelResolution.SelectedItem is not null)
+                SaveSettingsSilently();
+        };
+        designerPanel.Children.Add(_labelResolution);
+        designerPanel.Children.Add(new TextBlock
+        {
+            Text = "Choose the document's target resolution. This preference is saved on this PC.",
+            TextWrapping = TextWrapping.Wrap,
+            FontSize = 10,
+            Foreground = Brush("#77808C"),
+            Margin = new Thickness(0, 0, 0, 8)
+        });
+        designerPanel.Children.Add(new TextBlock
+        {
             Text = "OPTIONAL ELEMENTS",
             FontWeight = FontWeights.Bold,
             FontSize = 11,
@@ -443,6 +474,7 @@ public partial class MainWindow : Window
         if (_barcodeEnabled is not null) _barcodeEnabled.IsChecked = _settings.BarcodeEnabled;
         if (_qrEnabled is not null) _qrEnabled.IsChecked = _settings.QrEnabled;
         if (_automaticUpdates is not null) _automaticUpdates.IsChecked = _settings.AutomaticUpdatesEnabled;
+        if (_labelResolution is not null) _labelResolution.SelectedItem = $"{NormalizeDocumentDpi(_settings.DocumentDpi)} DPI";
     }
 
     private void SaveSettings_Click(object sender, RoutedEventArgs e) => SaveSettingsSilently();
@@ -464,6 +496,8 @@ public partial class MainWindow : Window
             _settings.BarcodeEnabled = _barcodeEnabled?.IsChecked == true;
             _settings.QrEnabled = _qrEnabled?.IsChecked == true;
             _settings.AutomaticUpdatesEnabled = _automaticUpdates?.IsChecked != false;
+            _settings.DocumentDpi = _labelResolution?.SelectedItem is string dpiText && int.TryParse(dpiText.Replace(" DPI", "", StringComparison.Ordinal), out var dpi)
+                ? NormalizeDocumentDpi(dpi) : NormalizeDocumentDpi(_settings.DocumentDpi);
 
             if (_settings.MinimumFontSize <= 0 || _settings.MaximumFontSize < _settings.MinimumFontSize)
                 throw new InvalidOperationException("Maximum font size must be greater than or equal to the positive minimum font size.");
@@ -551,6 +585,8 @@ public partial class MainWindow : Window
         _clockTime.Visibility = _settings.ShowTime ? Visibility.Visible : Visibility.Collapsed;
         _clockDay.Visibility = _settings.ShowDayName ? Visibility.Visible : Visibility.Collapsed;
     }
+
+    private static int NormalizeDocumentDpi(int dpi) => dpi is 300 or 600 or 720 ? dpi : 300;
 
     private static int ParseFontSize(string? value, int fallback) =>
         int.TryParse(value, out var parsed) ? parsed : fallback;
@@ -952,7 +988,8 @@ public partial class MainWindow : Window
             LayoutStatus.Text = $"A {width:0.##} × {height:0.##} mm label does not fit this sheet with 5 mm margins and 3 mm gaps.";
             return;
         }
-        LayoutStatus.Text = $"{LabelPaperSize.Text} · {columns} columns × {rows} rows · {columns * rows} labels/sheet. Geometry only; printer hardware margins are not yet checked.";
+        var dpi = NormalizeDocumentDpi(_settings.DocumentDpi);
+        LayoutStatus.Text = $"{LabelPaperSize.Text} · {columns} columns × {rows} rows · {columns * rows} labels/sheet · Document resolution: {dpi} DPI. Geometry only; printer hardware margins are not yet checked.";
     }
 
     private void RefreshPrinters_Click(object sender, RoutedEventArgs e) => RefreshPrinters();
@@ -1070,6 +1107,7 @@ public partial class MainWindow : Window
         public bool BarcodeEnabled { get; set; }
         public bool QrEnabled { get; set; }
         public bool AutomaticUpdatesEnabled { get; set; } = true;
+        public int DocumentDpi { get; set; } = 300;
     }
 
     private sealed class ProductRow
