@@ -127,6 +127,13 @@ internal sealed class AccountWindow : Window
         stack.Children.Add(new TextBlock { Text = "LICENSE", FontSize = 10, FontWeight = FontWeights.Bold, Foreground = Brush("#98702B") });
         stack.Children.Add(new TextBlock { Text = $"{session.Plan} · {session.LicenseStatus}", FontSize = 14, Foreground = Brush("#20242B"), Margin = new Thickness(0, 5, 0, 3) });
         stack.Children.Add(new TextBlock { Text = session.ExpiresAt is null ? "No expiry date returned" : $"Expires: {session.ExpiresAt}", FontSize = 11, Foreground = Brush("#77808C") });
+        var cloud = new Button { Content = "Cloud backup & license", Height = 42, Margin = new Thickness(0, 20, 0, 0), Background = Brush("#C69A43"), Foreground = Brush("#20242B"), FontWeight = FontWeights.SemiBold };
+        cloud.Click += (_, _) =>
+        {
+            var services = new BackupLicenseWindow { Owner = this };
+            if (services.ShowDialog() == true) { DialogResult = true; Close(); }
+        };
+        stack.Children.Add(cloud);
         var signOut = new Button { Content = "Sign out", Height = 40, Margin = new Thickness(0, 28, 0, 0), Background = Brush("#20242B"), Foreground = Brushes.White };
         signOut.Click += async (_, _) => { await RssCoreAccountClient.SignOutAsync(); DialogResult = false; Close(); };
         stack.Children.Add(signOut);
