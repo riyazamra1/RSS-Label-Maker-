@@ -58,23 +58,26 @@ Before creating the sheet preview, the user must set:
 - Label size remains editable while in Label Design. Changing label width or height immediately updates the design canvas physical bounds, sheet preview, and labels-per-page calculation. Warn before destructive clipping/reflow; do not silently distort existing elements.
 - Recalculate automatically whenever label size, paper, orientation, unit, resolution, printer, margins or gaps change.
 
-## 6. Maximum labels per page calculation
+## 6. Maximum label count per page
 
-The application must always automatically fit the **maximum possible whole labels** on the selected page within the effective printable area. Do not leave avoidable unused rows or columns and do not default to a smaller fixed label count.
+The goal is to print the **greatest possible number of copies of the selected label on one sheet**. This does not mean maximizing, enlarging, stretching, or scaling the label to fill the page.
+
+- Keep each label at its user-defined physical width and height.
+- Never automatically enlarge or shrink a label to fill unused page space.
+- Calculate how many whole labels fit within the effective printable area, respecting the selected label size, paper size, orientation, margins and gaps.
+- Use the available page area efficiently; do not leave a row or column unused when another complete label would fit.
 
 For a given orientation and placement:
 - columns = floor((usable width + horizontal gap) / (label width + horizontal gap))
 - rows = floor((usable height + vertical gap) / (label height + vertical gap))
 - labels per sheet = columns × rows
 
-Evaluate both row/column orientations where rotation is permitted by the label design and printer, and choose the valid arrangement producing the greatest whole-label count. Do not rotate a label design without user permission if rotation changes its intended orientation. If both arrangements produce the same count, prefer the one preserving the design's current orientation.
+Evaluate both page orientations when allowed by the user and printer. Choose the valid arrangement with the highest count of complete labels. Do not rotate the label artwork automatically if that would change its intended orientation.
 
-- Usable page area accounts for paper dimensions, printer hardware limits, configured margins and gaps.
-- Show calculated rows, columns, total labels per sheet, remaining space and any unused area.
-- Recalculate live after any relevant setting changes.
-- Never overlap or clip labels. If even one label cannot fit, explain why and show the required printable area.
-- The print preview must show every calculated label at the correct physical size and position.
-
+- Show calculated rows, columns, total labels per sheet, remaining space and unused area.
+- Recalculate live after relevant setting changes.
+- Never overlap or clip labels. If no complete label fits, explain why and show the required printable area.
+- Print preview must show each repeated label at the exact user-defined physical size and position.
 ## 7. Nutrition visibility and units
 
 Sugar, Salt and Fat are independent optional elements:
@@ -141,7 +144,7 @@ The redesign is not complete until:
 - Users can customize all four sheet margins and horizontal/vertical gaps.
 - Users can type a custom DPI value as well as select the 300/600/720 presets.
 - Label size can be changed during design and the canvas and print calculations update immediately.
-- The sheet layout automatically selects the maximum valid number of labels per page.
+- The sheet layout calculates the greatest number of complete copies of the fixed-size label that fit on each page, without automatically enlarging or shrinking the label.
 - Print preview displays the complete calculated page accurately.
 - Zero-valued nutrition fields remain visible; unentered fields are hidden; all-unentered hides the nutrition section.
 - Nutrition units are independently selectable and saved.
