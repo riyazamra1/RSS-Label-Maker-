@@ -30,8 +30,8 @@ internal static class UpdateService
         var root = release.RootElement;
         var releaseNotes = root.TryGetProperty("body", out var bodyElement) ? bodyElement.GetString() ?? "" : "";
         // Never surface repository/provider URLs or provider branding inside the application.
-        releaseNotes = Regex.Replace(releaseNotes, @"(?im)^.*(?:github\\.com|githubusercontent\\.com).*$", "").Trim();
-        releaseNotes = Regex.Replace(releaseNotes, @"https?://\\S+", "[external link omitted]");
+        releaseNotes = Regex.Replace(releaseNotes, @"(?im)^.*(?:github\.com|githubusercontent\.com).*$", "").Trim();
+        releaseNotes = Regex.Replace(releaseNotes, @"https?://\S+", "[external link omitted]");
         var tag = root.GetProperty("tag_name").GetString()?.TrimStart('v', 'V');
         if (!Version.TryParse(tag, out var latest)) return null;
 
