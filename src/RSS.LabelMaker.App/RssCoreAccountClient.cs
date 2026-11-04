@@ -28,10 +28,9 @@ internal static class RssCoreAccountClient
         {
             display_name = name, email, password, project_key = ProjectKey
         });
-        using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
-        if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException(ReadError(document.RootElement, "Registration failed."));
-        var required = document.RootElement.TryGetProperty("email_verification_required", out var value) && value.GetBoolean();
+        using var document = await ReadJsonResponseAsync(response, "Registration failed.");
+        var required = document.RootElement.TryGetProperty("email_verification_required", out var value)
+            && value.ValueKind == JsonValueKind.True;
         return required
             ? "Registration received. Open the verification email sent to your inbox, then return here and sign in. The link expires in 24 hours."
             : "Your RSS account is ready. You can now sign in.";
@@ -43,9 +42,7 @@ internal static class RssCoreAccountClient
         {
             email, project_key = ProjectKey
         });
-        using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
-        if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException(ReadError(document.RootElement, "Unable to resend verification email."));
+        using var document = await ReadJsonResponseAsync(response, "Unable to resend verification email.");
         return "If this account still needs verification, a new verification email has been sent.";
     }
 
@@ -55,9 +52,7 @@ internal static class RssCoreAccountClient
         {
             email, password, project_key = ProjectKey
         });
-        using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
-        if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException(ReadError(document.RootElement, "Sign-in failed."));
+        using var document = await ReadJsonResponseAsync(response, "Sign-in failed.");
         var root = document.RootElement;
         var token = root.GetProperty("token").GetString();
         if (string.IsNullOrWhiteSpace(token)) throw new InvalidOperationException("RSS Core did not return a session token.");
@@ -78,7 +73,7 @@ internal static class RssCoreAccountClient
             return null;
         }
         if (!response.IsSuccessStatusCode) throw new HttpRequestException("RSS Core account service is temporarily unavailable.");
-        using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+        using var document = await ReadJsonResponseAsync(response, "RSS Core returned an invalid account response.");
         return ReadSession(document.RootElement);
     }
 
@@ -101,8 +96,7 @@ internal static class RssCoreAccountClient
     public static async Task<RssAccountSession> GetLicenseAsync()
     {
         using var response = await SendAuthenticatedAsync(HttpMethod.Get, ApiBase + "me");
-        using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
-        EnsureSuccess(response, document.RootElement, "Unable to load license information.");
+        using var document = await ReadJsonResponseAsync(response, "Unable to load license information.");
         return ReadSession(document.RootElement);
     }
 
@@ -123,11 +117,6 @@ internal static class RssCoreAccountClient
         return response;
     }
 
-    private static void EnsureSuccess(HttpResponseMessage response, JsonElement root, string fallback)
-    {
-        if (!response.IsSuccessStatusCode) throw new InvalidOperationException(ReadError(root, fallback));
-    }
-
     private static RssAccountSession ReadSession(JsonElement root)
     {
         var user = root.GetProperty("user");
@@ -142,8 +131,50 @@ internal static class RssCoreAccountClient
             license.TryGetProperty("expires_at", out var expiry) && expiry.ValueKind != JsonValueKind.Null ? expiry.GetString() : null);
     }
 
-    private static string ReadError(JsonElement root, string fallback) =>
-        root.TryGetProperty("error", out var error) ? error.GetString() ?? fallback : fallback;
+    private static async Task<JsonDocument> ReadJsonResponseAsync(HttpResponseMessage response, string fallback)
+    {
+        var body = await response.Content.ReadAsStringAsync();
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException(ReadError(body, fallback));
+
+        try
+        {
+            return JsonDocument.Parse(body);
+        }
+        catch (JsonException)
+        {
+            var detail = string.IsNullOrWhiteSpace(body)
+                ? "The server returned an empty response."
+                : body.Trim().Length > 400 ? body.Trim()[..400] : body.Trim();
+            throw new InvalidOperationException(
+                $"{fallback} RSS Core returned a successful HTTP response that was not valid JSON. Response: {detail}");
+        }
+    }
+
+    private static string ReadError(string body, string fallback)
+    {
+        if (string.IsNullOrWhiteSpace(body)) return fallback;
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            var root = document.RootElement;
+            foreach (var key in new[] { "error", "message", "detail" })
+            {
+                if (root.TryGetProperty(key, out var value) && value.ValueKind == JsonValueKind.String)
+                {
+                    var message = value.GetString();
+                    if (!string.IsNullOrWhiteSpace(message)) return message;
+                }
+            }
+        }
+        catch (JsonException) { }
+
+        var text = body.Trim();
+        if (text.StartsWith("<!DOCTYPE", StringComparison.OrdinalIgnoreCase)
+            || text.StartsWith("<html", StringComparison.OrdinalIgnoreCase))
+            return $"{fallback} RSS Core returned an HTML error page.";
+        return text.Length <= 400 ? text : text[..400];
+    }
 
     private static void SaveToken(string token)
     {
