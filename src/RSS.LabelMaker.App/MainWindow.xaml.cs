@@ -44,6 +44,7 @@ public partial class MainWindow : Window
         ProductsGrid.ItemsSource = _products;
         InitializeProductDatabase();
         LoadProducts();
+        AutomaticBackupSyncService.Start(GetDatabasePath(), message => Dispatcher.InvokeAsync(() => ProductStatus.Text = message));
         RefreshPrinters();
         ShowPage("Dashboard");
         BuildClockAndSettingsUi();
@@ -66,6 +67,7 @@ public partial class MainWindow : Window
             SaveSessionSnapshot();
             _clockTimer.Stop();
             _sessionTimer.Stop();
+            AutomaticBackupSyncService.Stop();
         };
     }
 
@@ -832,6 +834,7 @@ public partial class MainWindow : Window
             command.Parameters.AddWithValue("$printWeight", product.PrintNetWeight ? 1 : 0);
             command.Parameters.AddWithValue("$createdUtc", DateTimeOffset.UtcNow.ToString("O"));
             command.ExecuteNonQuery();
+            AutomaticBackupSyncService.MarkDatabaseChanged();
             _products.Add(product);
             ProductCount.Text = _products.Count.ToString();
             ProductStatus.Text = "Product saved to the local SQLite database.";

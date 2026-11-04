@@ -39,7 +39,7 @@ internal sealed class BackupLicenseWindow : Window
         var root = new StackPanel { Margin = new Thickness(26) };
         root.Children.Add(new TextBlock { Text = "RSS CLOUD SERVICES", Foreground = Brush("#A47A32"), FontSize = 11, FontWeight = FontWeights.Bold });
         root.Children.Add(new TextBlock { Text = "Google Drive Backup & Restore", Foreground = Brush("#20242B"), FontSize = 25, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 5, 0, 4) });
-        root.Children.Add(new TextBlock { Text = "Your product database stays on this PC. Cloud backups are saved only to your Google Drive in the “RSS Label Maker Backups” folder. Normal label creation and printing work offline.", Foreground = Brush("#68717D"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 18) });
+        root.Children.Add(new TextBlock { Text = "Your product database stays on this PC. Automatic background sync uploads changes to your Google Drive in the “RSS Label Maker Backups” folder. Offline edits and printing continue normally; pending backups retry when connected.", Foreground = Brush("#68717D"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 18) });
 
         var licenseCard = new Border { Background = Brushes.White, CornerRadius = new CornerRadius(8), Padding = new Thickness(16), Margin = new Thickness(0, 0, 0, 16) };
         var licenseStack = new StackPanel();
@@ -71,7 +71,8 @@ internal sealed class BackupLicenseWindow : Window
         try
         {
             await GoogleDriveBackupClient.ConnectAsync();
-            _status.Text = "Google Drive connected. Your authorization is stored locally on this PC.";
+            AutomaticBackupSyncService.RequestSync();
+            _status.Text = "Google Drive connected. Automatic backup sync is queued. Your authorization is stored locally on this PC.";
             await RefreshAsync();
         }
         catch (Exception ex) { _status.Text = ex.Message; }
@@ -190,7 +191,8 @@ internal sealed class BackupLicenseWindow : Window
             if (File.Exists(DatabasePath)) File.Replace(temporaryDb, DatabasePath, null);
             else File.Move(temporaryDb, DatabasePath);
             temporaryDb = null;
-            _status.Text = $"Restore completed. Previous database safety copy: {Path.GetFileName(safetyCopy)}";
+            AutomaticBackupSyncService.RequestSync();
+            _status.Text = $"Restore completed. Previous database safety copy: {Path.GetFileName(safetyCopy)}. Restored data queued for cloud sync.";
             MessageBox.Show(this, "Product database restored. RSS Label Maker will refresh the product list when this window closes.", "Restore complete", MessageBoxButton.OK, MessageBoxImage.Information);
             DialogResult = true;
             Close();
@@ -200,6 +202,51 @@ internal sealed class BackupLicenseWindow : Window
         {
             if (temporaryDb is not null) TryDelete(temporaryDb);
             SetBusy(false);
+        }
+    }
+
+    internal static async Task UploadDatabaseSnapshotAsync(string databasePath, CancellationToken cancellationToken = default)
+    {
+        if (!File.Exists(databasePath))
+            throw new FileNotFoundException("The local product database was not found.", databasePath);
+        if (!GoogleDriveBackupClient.IsConfigured)
+            throw new InvalidOperationException(GoogleDriveBackupClient.SetupInstructions);
+
+        Directory.CreateDirectory(DataDirectory);
+        var snapshotPath = Path.Combine(DataDirectory, "automatic-backup-snapshot-" + Guid.NewGuid().ToString("N") + ".db");
+        try
+        {
+            await CreateSqliteSnapshotAsync(databasePath, snapshotPath);
+            var archiveBytes = await Task.Run(() =>
+            {
+                using var output = new MemoryStream();
+                using (var archive = new ZipArchive(output, ZipArchiveMode.Create, true))
+                {
+                    var dbEntry = archive.CreateEntry("rss-label-maker.db", CompressionLevel.Optimal);
+                    using (var target = dbEntry.Open())
+                    using (var source = File.OpenRead(snapshotPath)) source.CopyTo(target);
+                    var manifest = archive.CreateEntry("backup-manifest.json", CompressionLevel.Optimal);
+                    using var writer = new StreamWriter(manifest.Open(), Encoding.UTF8);
+                    writer.Write(JsonSerializer.Serialize(new
+                    {
+                        app = "RSS Label Maker",
+                        format = 1,
+                        created_utc = DateTimeOffset.UtcNow,
+                        backup_type = "automatic"
+                    }));
+                }
+                return output.ToArray();
+            }, cancellationToken);
+
+            if (archiveBytes.Length > 100 * 1024 * 1024)
+                throw new InvalidOperationException("This backup exceeds the current 100 MB per-backup safety limit.");
+            var hash = Convert.ToHexString(SHA256.HashData(archiveBytes)).ToLowerInvariant();
+            var fileName = $"rss-label-maker-auto-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.zip";
+            await GoogleDriveBackupClient.UploadBackupAsync(archiveBytes, fileName, hash, cancellationToken);
+        }
+        finally
+        {
+            TryDelete(snapshotPath);
         }
     }
 
