@@ -8,8 +8,6 @@ using System.Text.Json;
 
 namespace RSS.LabelMaker.App;
 
-internal sealed record RssCloudBackup(string Id, string FileName, long SizeBytes, string Sha256, DateTimeOffset CreatedAt);
-
 internal sealed record RssAccountSession(string Id, string Email, string Name, string AppKey, string Plan, string LicenseStatus, string? ExpiresAt);
 
 internal static class RssCoreAccountClient
@@ -99,49 +97,6 @@ internal static class RssCoreAccountClient
         finally { ClearToken(); }
     }
 
-
-    private const string BackupApi = "https://rsscore.cv/api/v1/customer-backups";
-    private const string LicenseApi = "https://rsscore.cv/api/v1/customer-auth/license";
-
-    public static async Task<IReadOnlyList<RssCloudBackup>> GetBackupsAsync()
-    {
-        using var response = await SendAuthenticatedAsync(HttpMethod.Get, BackupApi);
-        using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
-        EnsureSuccess(response, document.RootElement, "Unable to load cloud backups.");
-        var items = new List<RssCloudBackup>();
-        foreach (var item in document.RootElement.GetProperty("backups").EnumerateArray())
-            items.Add(new RssCloudBackup(
-                item.GetProperty("id").GetString() ?? "",
-                item.GetProperty("file_name").GetString() ?? "backup.zip",
-                item.GetProperty("size_bytes").GetInt64(),
-                item.GetProperty("sha256").GetString() ?? "",
-                DateTimeOffset.FromUnixTimeMilliseconds(item.GetProperty("created_at").GetInt64()).ToLocalTime()));
-        return items;
-    }
-
-    public static async Task CreateBackupAsync(byte[] archive, string fileName, string sha256)
-    {
-        var payload = new
-        {
-            file_name = fileName,
-            content_base64 = Convert.ToBase64String(archive),
-            sha256
-        };
-        using var response = await SendAuthenticatedAsync(HttpMethod.Post, BackupApi, payload);
-        using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
-        EnsureSuccess(response, document.RootElement, "Cloud backup failed.");
-    }
-
-    public static async Task<byte[]> DownloadBackupAsync(string id)
-    {
-        using var response = await SendAuthenticatedAsync(HttpMethod.Get, BackupApi + "/" + Uri.EscapeDataString(id));
-        if (!response.IsSuccessStatusCode)
-        {
-            using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
-            throw new InvalidOperationException(ReadError(document.RootElement, "Unable to download backup."));
-        }
-        return await response.Content.ReadAsByteArrayAsync();
-    }
 
     public static async Task<RssAccountSession> GetLicenseAsync()
     {
