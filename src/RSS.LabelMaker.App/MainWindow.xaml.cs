@@ -96,7 +96,7 @@ public partial class MainWindow : Window
                     _accountButton.Click += async (_, _) =>
                     {
                         var account = new AccountWindow { Owner = this };
-                        account.ShowDialog();
+                        if (account.ShowDialog() == true) LoadProducts();
                         await RefreshAccountButtonAsync();
                     };
                     existingRightPanel.Children.Insert(0, _accountButton);
@@ -904,6 +904,7 @@ public partial class MainWindow : Window
 
     private void LoadProducts()
     {
+        _products.Clear();
         using var connection = new SqliteConnection($"Data Source={GetDatabasePath()}");
         connection.Open();
         using var command = connection.CreateCommand();
