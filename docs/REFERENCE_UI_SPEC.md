@@ -31,6 +31,17 @@ The Dashboard must contain these tabs and share one underlying label document/pr
 
 Changing data in any tab updates the same live label preview immediately.
 
+### Automatic Sinhala and Tamil product names
+
+- When the user enters or changes the English Product Name, automatically generate and populate the Sinhala Product Name and Tamil Product Name fields. Do not require the user to type those translations manually or press a separate transliteration button.
+- Keep both generated language fields visible, editable, and included in the live label preview. The user can correct either translation manually.
+- When the English source name changes, refresh translations that were previously auto-generated. Do not overwrite a Sinhala or Tamil field that the user has manually edited; preserve that manual value unless the user explicitly requests regeneration.
+- Show a clear pending/error state if automatic transliteration cannot complete. Never silently substitute the English text or erase an existing translation on failure.
+- Automatic English-to-Sinhala and English-to-Tamil transliteration follows the existing entitlement: five free automatic transliteration uses, then an active Premium subscription is required. Count usage according to the existing licensing rules and avoid charging/counting repeated background requests for the same unchanged English name.
+- Manual Sinhala and Tamil entry/editing remains free and available offline, including after the automatic transliteration allowance is exhausted.
+- Save generated and manually edited language values with the product so they remain available offline and in Excel import/export.
+
+
 ## 4. Units and measurement preferences
 
 - Provide a user-selectable measurement unit for label and custom paper dimensions: millimetres (mm), centimetres (cm), and inches (in).
@@ -140,6 +151,7 @@ The redesign is not complete until:
 - The main Dashboard visually follows the supplied screenshot's composition and hierarchy.
 - Users can enter all product/company details from Dashboard tabs without navigating away.
 - Every input updates the live preview.
+- Entering an English product name automatically populates editable Sinhala and Tamil names under the existing five-free-uses-then-Premium entitlement; manual local-language entry remains free and offline.
 - Units can be changed without changing the underlying physical dimensions.
 - Users can customize all four sheet margins and horizontal/vertical gaps.
 - Users can type a custom DPI value as well as select the 300/600/720 presets.
