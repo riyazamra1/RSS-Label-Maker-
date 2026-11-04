@@ -99,6 +99,14 @@ internal static class GoogleDriveBackupClient
     private static async Task<UserCredential> AuthorizeAsync(CancellationToken cancellationToken)
     {
         if (!IsConfigured) throw new InvalidOperationException(SetupInstructions);
+
+        // Every Google Drive operation, including the initial connection, requires
+        // a currently valid RSS Core account session. Google authorization alone
+        // must never grant access to the cloud-backup feature.
+        var rssSession = await RssCoreAccountClient.GetSessionAsync();
+        if (rssSession is null)
+            throw new InvalidOperationException("Sign in to your verified RSS account before connecting to or using Google Drive backup.");
+
         Directory.CreateDirectory(AppDirectory);
         var secrets = GoogleClientSecrets.FromFile(OAuthConfigPath).Secrets;
         if (string.IsNullOrWhiteSpace(secrets.ClientId) || string.IsNullOrWhiteSpace(secrets.ClientSecret))
