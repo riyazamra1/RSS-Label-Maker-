@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 
 namespace RSS.LabelMaker.App;
@@ -1082,7 +1083,87 @@ public partial class MainWindow : Window
 
     private void TestPrint_Click(object sender, RoutedEventArgs e)
     {
-        PrintStatus.Text = "Printer discovery works. Actual-size label rendering and test-page printing are scheduled for the printing milestone.";
+        try
+        {
+            var dpi = NormalizeDocumentDpi(_settings.DocumentDpi);
+            var printDialog = new PrintDialog();
+            if (PrinterList.SelectedItem is PrinterOption selected)
+            {
+                using var server = new LocalPrintServer();
+                printDialog.PrintQueue = server.GetPrintQueue(selected.QueueName);
+            }
+
+            if (printDialog.ShowDialog() != true)
+            {
+                PrintStatus.Text = "Test print cancelled.";
+                return;
+            }
+
+            // A4 page in WPF device-independent units (1/96 inch), rasterized
+            // at the selected document DPI before being sent to the printer.
+            const double pageWidthMm = 210d;
+            const double pageHeightMm = 297d;
+            const double mmPerInch = 25.4d;
+            var pageWidthDip = pageWidthMm / mmPerInch * 96d;
+            var pageHeightDip = pageHeightMm / mmPerInch * 96d;
+            var pixelWidth = (int)Math.Round(pageWidthMm / mmPerInch * dpi);
+            var pixelHeight = (int)Math.Round(pageHeightMm / mmPerInch * dpi);
+
+            var drawing = new DrawingVisual();
+            using (var context = drawing.RenderOpen())
+            {
+                context.DrawRectangle(Brushes.White, null, new Rect(0, 0, pageWidthDip, pageHeightDip));
+                var margin = 18d / mmPerInch * 96d;
+                var pen = new Pen(Brushes.Black, 0.5);
+                context.DrawRectangle(null, pen, new Rect(margin, margin, pageWidthDip - margin * 2, pageHeightDip - margin * 2));
+
+                var title = new FormattedText(
+                    "RSS LABEL MAKER — DPI CALIBRATION",
+                    CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+                    new Typeface("Arial"), 18, Brushes.Black, 1.0);
+                context.DrawText(title, new Point(margin + 12, margin + 12));
+
+                var details = new FormattedText(
+                    $"Document resolution: {dpi} DPI\nPage: A4 · 210 × 297 mm\nPrinted: {DateTime.Now:yyyy-MM-dd HH:mm:ss}",
+                    CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+                    new Typeface("Arial"), 11, Brushes.Black, 1.0);
+                context.DrawText(details, new Point(margin + 12, margin + 48));
+
+                // The horizontal calibration rule is exactly 100 mm in page coordinates.
+                var calibrationY = margin + 125;
+                context.DrawLine(new Pen(Brushes.Black, 1), new Point(margin + 12, calibrationY),
+                    new Point(margin + 12 + 100d / mmPerInch * 96d, calibrationY));
+                context.DrawLine(new Pen(Brushes.Black, 1), new Point(margin + 12, calibrationY - 5),
+                    new Point(margin + 12, calibrationY + 5));
+                context.DrawLine(new Pen(Brushes.Black, 1), new Point(margin + 12 + 100d / mmPerInch * 96d, calibrationY - 5),
+                    new Point(margin + 12 + 100d / mmPerInch * 96d, calibrationY + 5));
+                var calibrationText = new FormattedText(
+                    "Calibration line: 100 mm (measure after printing)",
+                    CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+                    new Typeface("Arial"), 9, Brushes.Black, 1.0);
+                context.DrawText(calibrationText, new Point(margin + 12, calibrationY + 10));
+            }
+
+            var bitmap = new RenderTargetBitmap(pixelWidth, pixelHeight, dpi, dpi, PixelFormats.Pbgra32);
+            bitmap.Render(drawing);
+            bitmap.Freeze();
+
+            var pageImage = new System.Windows.Controls.Image
+            {
+                Source = bitmap,
+                Width = pageWidthDip,
+                Height = pageHeightDip,
+                Stretch = Stretch.Fill
+            };
+            printDialog.PrintVisual(pageImage, $"RSS Label Maker {dpi} DPI calibration page");
+            PrintStatus.Text = $"Sent A4 calibration page to {printDialog.PrintQueue.Name} at {dpi} DPI. Measure the printed 100 mm line to confirm the printer's actual-size setting.";
+        }
+        catch (Exception ex)
+        {
+            PrintStatus.Text = $"Test print failed: {ex.Message}";
+            MessageBox.Show(this, ex.Message, "RSS Label Maker — Print test failed",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private sealed class TimeZoneOption
