@@ -40,7 +40,7 @@ internal sealed class AccountWindow : Window
         card.Child = stack;
         stack.Children.Add(new TextBlock { Text = "RSS ACCOUNT", Foreground = Brush("#C69A43"), FontSize = 11, FontWeight = FontWeights.Bold });
         stack.Children.Add(new TextBlock { Text = "Sign in to your RSS account", Foreground = Brush("#20242B"), FontSize = 25, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 8, 0, 5) });
-        stack.Children.Add(new TextBlock { Text = "Cloud backup, restore and license management are linked to your RSS Core account. Label creation and printing remain available offline.", TextWrapping = TextWrapping.Wrap, Foreground = Brush("#77808C"), FontSize = 12, Margin = new Thickness(0, 0, 0, 20) });
+        stack.Children.Add(new TextBlock { Text = "Your RSS account and license are managed by RSS Core. Optional product database backups are stored in your own Google Drive. Label creation and printing remain available offline.", TextWrapping = TextWrapping.Wrap, Foreground = Brush("#77808C"), FontSize = 12, Margin = new Thickness(0, 0, 0, 20) });
         var tabs = new StackPanel { Orientation = Orientation.Horizontal };
         var login = new Button { Content = "Sign in", Padding = new Thickness(18, 8, 18, 8), Margin = new Thickness(0, 0, 8, 14), Background = Brush("#20242B"), Foreground = Brushes.White };
         var register = new Button { Content = "Create account", Padding = new Thickness(18, 8, 18, 8), Margin = new Thickness(0, 0, 0, 14), Background = Brush("#F0F1F3"), Foreground = Brush("#20242B") };
