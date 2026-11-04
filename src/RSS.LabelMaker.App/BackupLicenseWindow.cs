@@ -92,6 +92,13 @@ internal sealed class BackupLicenseWindow : Window
                 _status.Text = GoogleDriveBackupClient.SetupInstructions;
                 return;
             }
+            if (!GoogleDriveBackupClient.HasSavedAuthorization)
+            {
+                _items = Array.Empty<GoogleDriveBackup>();
+                _backups.ItemsSource = Array.Empty<string>();
+                _status.Text = "Google Drive is configured but not connected. Select Connect Google Drive to sign in.";
+                return;
+            }
             _items = await GoogleDriveBackupClient.GetBackupsAsync();
             _backups.ItemsSource = _items.Select(x => $"{x.CreatedAt:yyyy-MM-dd HH:mm}  ·  {x.FileName}  ·  {FormatSize(x.SizeBytes)}").ToArray();
             _status.Text = _items.Count == 0 ? "No backups found in the RSS Label Maker Backups folder. Create your first backup." : $"{_items.Count} Google Drive backup(s) available.";
