@@ -289,6 +289,20 @@ Requirements:
 - Update checks require internet; normal product management, label design, session recovery from local data and printing must remain available offline.
 - Do not silently overwrite user work or install an unverified update package.
 
+
+### 15.2 Installer-time update check
+
+- The Windows setup installer must check the official RSS Label Maker release channel for a newer stable version before beginning installation.
+- Compare the setup package version with the latest published stable release. If the online version is newer, clearly offer the user the option to download and install the latest setup package before continuing.
+- The setup must not silently install an outdated package when a newer stable release is available. The user may continue with the supplied package only after an explicit choice, where that package remains compatible.
+- Download the replacement installer over HTTPS and verify its SHA-256 checksum against the checksum published with that exact release before launching it.
+- Verify the publisher/signature where code signing is configured; checksum validation alone is integrity checking and must not be represented as proof of publisher identity.
+- Show the installed/setup version, latest available version, download progress, verification result and clear error messages.
+- If the network is unavailable or the update service cannot be reached, offer an explicit **Continue with this installer (offline)** option. Do not block installation of the supplied valid package solely because the update service is unavailable.
+- Do not require GitHub sign-in or expose repository-management links in the installer UI. Use the official release metadata and downloadable release assets in the background.
+- After installation or upgrade, preserve existing local user data, SQLite database, templates, company records, settings and recovery checkpoints. Never uninstall or overwrite user data as part of an application upgrade.
+- The installer-time check is separate from the in-app automatic update setting: disabling automatic updates inside the application must not silently bypass the setup check. The installer must always check when online, while allowing the user to continue with the supplied package explicitly.
+
 ## 16. Testing and acceptance criteria
 
 1. Create and edit a product with English, Sinhala and Tamil names.
@@ -310,6 +324,7 @@ Requirements:
 12. Import Excel/CSV with field mapping and row-level validation.
 13. Back up and restore the SQLite database successfully.
 14. Build and launch the Windows installer on supported Windows 10 and Windows 11 test machines.
+14a. Verify installer-time version comparison, newer-installer offer, HTTPS download, checksum verification, offline continuation, and preservation of existing user data during upgrade.
 
 15. Verify automatic update behaviour: update check/download, package verification, safe installation, automatic restart, restoration of the last session and latest recoverable draft, preservation of SQLite data/licence information, and rollback/data protection when an update fails.
 

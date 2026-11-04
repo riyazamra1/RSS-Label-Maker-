@@ -52,7 +52,7 @@ internal static class GoogleDriveBackupClient
                 file.Name ?? "RSS Label Maker backup.zip",
                 file.Size ?? 0,
                 file.AppProperties is not null && file.AppProperties.TryGetValue("sha256", out var hash) ? hash : "",
-                file.CreatedTimeDateTimeOffset ?? DateTimeOffset.MinValue))
+                file.CreatedTime.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(file.CreatedTime.Value, DateTimeKind.Utc)).ToLocalTime() : DateTimeOffset.MinValue))
             .ToArray();
     }
 
