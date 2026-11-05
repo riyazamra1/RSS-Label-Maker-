@@ -37,6 +37,8 @@ public partial class MainWindow : Window
     private CheckBox? _automaticUpdates;
     private TextBlock? _updateStatus;
     private Button? _accountButton;
+    private RssAccountSession? _accountSession;
+    private Border? _verificationBanner;
 
     public MainWindow()
     {
@@ -51,8 +53,36 @@ public partial class MainWindow : Window
         WireDesignerOptionPersistence();
         UpdateClock();
         InitializeSessionRecovery();
+        AddVerificationBanner();
         Loaded += async (_, _) =>
         {
+            try
+            {
+                _accountSession = await RssCoreAccountClient.GetSessionAsync();
+                if (_accountSession is null)
+                {
+                    var account = new AccountWindow { Owner = this };
+                    if (account.ShowDialog() != true)
+                    {
+                        Close();
+                        return;
+                    }
+                    _accountSession = await RssCoreAccountClient.GetSessionAsync();
+                    if (_accountSession is null)
+                    {
+                        Close();
+                        return;
+                    }
+                }
+                ApplyAccountAccess();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, "RSS account service could not be reached. Sign-in is required to use RSS Label Maker.\n\n" + ex.Message,
+                    "RSS Account Required", MessageBoxButton.OK, MessageBoxImage.Warning);
+                Close();
+                return;
+            }
             await RefreshAccountButtonAsync();
             await ShowPendingUpdateWelcomeAsync();
             await CheckForUpdatesAsync(false);
@@ -145,17 +175,63 @@ public partial class MainWindow : Window
         if (_accountButton is null) return;
         try
         {
-            var session = await RssCoreAccountClient.GetSessionAsync();
-            _accountButton.Content = session is null ? "Sign in" : "My account";
-            _accountButton.ToolTip = session is null
-                ? "Sign in to RSS Core for cloud backup, restore and license management."
-                : $"Signed in as {session.Email}";
+            _accountSession = await RssCoreAccountClient.GetSessionAsync();
+            ApplyAccountAccess();
+            _accountButton.Content = _accountSession is null ? "Sign in" : "My account";
+            _accountButton.ToolTip = _accountSession is null
+                ? "Sign in to RSS Core."
+                : $"Signed in as {_accountSession.Email}" + (_accountSession.EmailVerified ? " (verified)" : " (email not verified)");
         }
         catch
         {
-            _accountButton.Content = "Sign in";
+            _accountButton.Content = "Account unavailable";
             _accountButton.ToolTip = "RSS Core account services require an internet connection.";
         }
+    }
+
+    private void AddVerificationBanner()
+    {
+        if (DashboardPage.Content is not StackPanel dashboard) return;
+        _verificationBanner = new Border
+        {
+            Background = Brush("#FFF4D6"),
+            BorderBrush = Brush("#E6C56C"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(7),
+            Padding = new Thickness(14),
+            Margin = new Thickness(0, 0, 0, 16),
+            Visibility = Visibility.Collapsed,
+            Child = new TextBlock
+            {
+                Text = "EMAIL VERIFICATION REQUIRED — You can use the dashboard, but product creation, label editing and printing remain locked until you verify your email. Use My Account to resend the verification email.",
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = Brush("#76520C"),
+                FontSize = 12
+            }
+        };
+        dashboard.Children.Insert(0, _verificationBanner);
+    }
+
+    private void ApplyAccountAccess()
+    {
+        var verified = _accountSession?.EmailVerified == true;
+        if (_verificationBanner is not null)
+            _verificationBanner.Visibility = verified ? Visibility.Collapsed : Visibility.Visible;
+        if (!verified && new[] { "Products", "Designer", "Templates", "Print", "Import" }.Contains(_lastActivePage, StringComparer.Ordinal))
+        {
+            _lastActivePage = "Dashboard";
+            ShowPage("Dashboard");
+        }
+    }
+
+    private bool RequireVerifiedEmail()
+    {
+        if (_accountSession?.EmailVerified == true) return true;
+        MessageBox.Show(this,
+            "Please verify your RSS account email address first. You can still use the dashboard and resend the verification email from My Account.",
+            "Email Verification Required", MessageBoxButton.OK, MessageBoxImage.Information);
+        ShowPage("Dashboard");
+        return false;
     }
 
     private void BuildSettingsPage()
@@ -740,6 +816,11 @@ public partial class MainWindow : Window
 
     private void ShowPage(string page)
     {
+        if (page != "Dashboard" && _accountSession?.EmailVerified != true)
+        {
+            RequireVerifiedEmail();
+            return;
+        }
         _lastActivePage = page;
         DashboardPage.Visibility = page == "Dashboard" ? Visibility.Visible : Visibility.Collapsed;
         ProductsPage.Visibility = page == "Products" ? Visibility.Visible : Visibility.Collapsed;
@@ -784,6 +865,7 @@ public partial class MainWindow : Window
 
     private void SaveProduct_Click(object sender, RoutedEventArgs e)
     {
+        if (!RequireVerifiedEmail()) return;
         if (string.IsNullOrWhiteSpace(EnglishName.Text))
         {
             ProductStatus.Text = "Enter an English product name before saving.";
@@ -929,6 +1011,7 @@ public partial class MainWindow : Window
 
     private void ApplyLayout_Click(object sender, RoutedEventArgs e)
     {
+        if (!RequireVerifiedEmail()) return;
         if (!double.TryParse(LabelWidthInput.Text, NumberStyles.Number, CultureInfo.InvariantCulture, out var width) ||
             !double.TryParse(LabelHeightInput.Text, NumberStyles.Number, CultureInfo.InvariantCulture, out var height) ||
             width <= 0 || height <= 0)
@@ -975,6 +1058,7 @@ public partial class MainWindow : Window
 
     private void TestPrint_Click(object sender, RoutedEventArgs e)
     {
+        if (!RequireVerifiedEmail()) return;
         PrintStatus.Text = "Printer discovery works. Actual-size label rendering and test-page printing are scheduled for the printing milestone.";
     }
 
