@@ -1,0 +1,32 @@
+name: RSS Label Maker Windows Build
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "*.sln"
+      - ".github/workflows/rlm-windows-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rlm-windows-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Restore
+        run: dotnet restore RSS.LabelMaker.sln
+      - name: Build Release
+        run: dotnet build RSS.LabelMaker.sln --configuration Release --no-restore
