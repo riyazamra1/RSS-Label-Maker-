@@ -139,10 +139,12 @@ The label preview must render the same document model used by print/PDF output. 
 Do not regress:
 - SQLite product persistence and existing data.
 - Account registration/sign-in and RSS Core licensing.
-- No Free plan or Free licence exists. The only trial is a 14-day Premium trial. After the 14-day trial expires, the user must purchase an applicable paid licence to continue using the software; never silently downgrade or convert the account to a permanent Free plan.
+- No Free plan or Free licence exists. The only trial is a 14-day Premium trial, bound to a durable device identity and enforced server-side. Reinstalling the application, deleting local data, reinstalling Windows, or updating the software must not reset or extend the trial on that PC. After expiry, the PC remains trial-expired until a valid paid licence is activated; any device replacement or registration correction requires controlled support review. Never silently downgrade or convert the account to a permanent Free plan.
 - Automatic backup/sync and restore.
 - Automatic updates and session recovery.
-- English-to-Sinhala/Tamil automatic transliteration entitlement: five free uses, then Premium; manual local-language entry remains free and offline.
+- Automatic English-to-Sinhala/Tamil transliteration is available only while the 14-day Premium trial is active or an applicable paid licence is active. There is no Free plan and no free-use allowance. Manual Sinhala/Tamil entry is available offline while the application has a valid trial or paid licence.
+- Bind the 14-day trial to a durable device identity recorded and validated by the licensing service, not merely to local installation files or an application-generated local timestamp. Uninstalling/reinstalling the application, deleting its local data, reinstalling Windows, or installing a newer version must not restart or extend the same PC's trial. The licensing service must retain the device's trial-start and expiry state so reinstalling or clearing local data cannot create another trial.
+- After the trial expires, that PC remains trial-expired until a valid paid licence is activated. Reinstalling must not restore Premium access. Provide a legitimate support/recovery path for hardware replacement or mistaken device registration, with controlled server-side review; do not offer a user-accessible trial reset.
 - Existing installer/update flow.
 
 ## 13. Acceptance criteria
@@ -152,6 +154,7 @@ The redesign is not complete until:
 - Users can enter all product/company details from Dashboard tabs without navigating away.
 - Every input updates the live preview.
 - Entering an English product name automatically populates editable Sinhala and Tamil names when the 14-day Premium trial or a paid licence is active. No Free plan or free transliteration allowance exists.
+- The same PC cannot obtain a fresh 14-day trial by reinstalling the application, deleting local data, reinstalling Windows, or updating the software; trial state is device-bound and enforced by the licensing service.
 - Units can be changed without changing the underlying physical dimensions.
 - Users can customize all four sheet margins and horizontal/vertical gaps.
 - Users can type a custom DPI value as well as select the 300/600/720 presets.
