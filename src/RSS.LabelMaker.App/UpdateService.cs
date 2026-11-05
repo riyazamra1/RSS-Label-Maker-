@@ -81,6 +81,18 @@ internal static class UpdateService
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "Razeen Secure Solution", "RSS Label Maker", "update-completed.json");
 
+    public static void MarkStartupHealthy()
+    {
+        var healthPath = Environment.GetEnvironmentVariable("RLM_UPDATE_HEALTH_PATH");
+        if (string.IsNullOrWhiteSpace(healthPath)) return;
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(healthPath)!);
+            File.WriteAllText(healthPath, DateTimeOffset.UtcNow.ToString("O"));
+        }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine("Update health signal failed: " + ex.Message); }
+    }
+
     public static UpdateWelcomeInfo? ReadPendingUpdate()
     {
         var path = GetUpdateMarkerPath();
@@ -100,6 +112,8 @@ internal static class UpdateService
         var packagePath = update.PackagePath;
         var updaterPath = Path.Combine(Path.GetDirectoryName(packagePath)!, "rlm-updater.ps1");
         var updateInfoPath = Path.Combine(Path.GetDirectoryName(packagePath)!, "update-info.json");
+        var healthPath = Path.Combine(Path.GetDirectoryName(packagePath)!, $"update-health-{parentProcessId}.txt");
+        try { if (File.Exists(healthPath)) File.Delete(healthPath); } catch { }
         File.WriteAllText(updateInfoPath, JsonSerializer.Serialize(new UpdateWelcomeInfo(
             update.PreviousVersion, update.Version, update.ReleaseNotes, DateTimeOffset.UtcNow)));
         File.WriteAllText(updaterPath, UpdaterScript);
@@ -124,6 +138,8 @@ internal static class UpdateService
         start.ArgumentList.Add(updateInfoPath);
         start.ArgumentList.Add("-MarkerPath");
         start.ArgumentList.Add(GetUpdateMarkerPath());
+        start.ArgumentList.Add("-HealthPath");
+        start.ArgumentList.Add(healthPath);
         _ = Process.Start(start) ?? throw new InvalidOperationException("Could not start the separate update process.");
     }
 
@@ -133,7 +149,8 @@ param(
     [Parameter(Mandatory=$true)][string]$ExecutablePath,
     [Parameter(Mandatory=$true)][int]$ParentPid,
     [Parameter(Mandatory=$true)][string]$UpdateInfoPath,
-    [Parameter(Mandatory=$true)][string]$MarkerPath
+    [Parameter(Mandatory=$true)][string]$MarkerPath,
+    [Parameter(Mandatory=$true)][string]$HealthPath
 )
 $ErrorActionPreference = 'Stop'
 $installDir = Split-Path -Parent $ExecutablePath
@@ -141,10 +158,13 @@ $exeName = Split-Path -Leaf $ExecutablePath
 $workDir = Join-Path $env:LOCALAPPDATA 'Razeen Secure Solution\RSS Label Maker\update-stage'
 $backupPath = Join-Path $workDir ($exeName + '.previous')
 New-Item -ItemType Directory -Force -Path $workDir | Out-Null
+$newProcess = $null
 try {
-    Wait-Process -Id $ParentPid -Timeout 120
-} catch {}
-try {
+    $parentDeadline = (Get-Date).AddSeconds(120)
+    while (Get-Process -Id $ParentPid -ErrorAction SilentlyContinue) {
+        if ((Get-Date) -gt $parentDeadline) { throw 'The previous application did not close in time; update was cancelled.' }
+        Start-Sleep -Seconds 1
+    }
     if (Test-Path $backupPath) { Remove-Item $backupPath -Force }
     Expand-Archive -LiteralPath $PackagePath -DestinationPath $workDir -Force
     $stagedExe = Join-Path $workDir $exeName
@@ -154,13 +174,25 @@ try {
     $markerDir = Split-Path -Parent $MarkerPath
     New-Item -ItemType Directory -Force -Path $markerDir | Out-Null
     Copy-Item $UpdateInfoPath $MarkerPath -Force
+    if (Test-Path $HealthPath) { Remove-Item $HealthPath -Force }
+    $env:RLM_UPDATE_HEALTH_PATH = $HealthPath
     $newProcess = Start-Process -FilePath $ExecutablePath -PassThru
-    Start-Sleep -Seconds 8
+    $healthDeadline = (Get-Date).AddSeconds(180)
+    while (!(Test-Path $HealthPath)) {
+        $newProcess.Refresh()
+        if ($newProcess.HasExited) { throw 'Updated application exited before confirming successful account startup; rolling back.' }
+        if ((Get-Date) -gt $healthDeadline) { throw 'Updated application did not complete startup validation; rolling back.' }
+        Start-Sleep -Seconds 1
+    }
     $newProcess.Refresh()
-    if ($newProcess.HasExited) { throw 'Updated application exited during startup; rolling back.' }
+    if ($newProcess.HasExited) { throw 'Updated application exited immediately after startup validation; rolling back.' }
+    Remove-Item Env:RLM_UPDATE_HEALTH_PATH -ErrorAction SilentlyContinue
     if (Test-Path $backupPath) { Remove-Item $backupPath -Force }
+    if (Test-Path $HealthPath) { Remove-Item $HealthPath -Force }
     Remove-Item $workDir -Recurse -Force -ErrorAction SilentlyContinue
 } catch {
+    Remove-Item Env:RLM_UPDATE_HEALTH_PATH -ErrorAction SilentlyContinue
+    if ($newProcess -and !$newProcess.HasExited) { Stop-Process -Id $newProcess.Id -Force -ErrorAction SilentlyContinue }
     if (Test-Path $MarkerPath) { Remove-Item $MarkerPath -Force -ErrorAction SilentlyContinue }
     if (Test-Path $backupPath) { Copy-Item $backupPath $ExecutablePath -Force }
     Start-Process -FilePath $ExecutablePath -ErrorAction SilentlyContinue

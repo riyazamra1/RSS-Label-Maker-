@@ -87,6 +87,7 @@ public partial class MainWindow : Window
                 return;
             }
             await RefreshAccountButtonAsync();
+            UpdateService.MarkStartupHealthy();
             await ShowPendingUpdateWelcomeAsync();
             await CheckForUpdatesAsync(false);
         };
