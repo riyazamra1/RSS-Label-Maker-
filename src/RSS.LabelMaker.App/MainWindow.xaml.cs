@@ -334,7 +334,7 @@ public partial class MainWindow : Window
             _automaticUpdates, _updateStatus, checkNow,
             new TextBlock
             {
-                Text = "Updates are downloaded only from the RSS Label Maker GitHub Releases page. A separate updater replaces the application and restarts it. Internet access is required; offline label work remains available.",
+                Text = "Updates use stable, versioned RSS Label Maker GitHub Releases. The updater verifies the SHA-256 package checksum, replaces the complete Windows application folder and checks successful startup before removing the previous version. Internet access is required; offline label work remains available.",
                 TextWrapping = TextWrapping.Wrap,
                 FontSize = 10,
                 Foreground = Brush("#77808C")
