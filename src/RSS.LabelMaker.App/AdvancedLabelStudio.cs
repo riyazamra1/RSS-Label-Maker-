@@ -10,7 +10,6 @@ using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Shapes;
 
 namespace RSS.LabelMaker.App;
 
@@ -43,6 +42,9 @@ public partial class MainWindow
     private void MainWindow_AdvancedLoaded(object sender, RoutedEventArgs e)
     {
         LoadNutritionUnits();
+        Sugar.TextChanged += (_, _) => UpdateNutritionUnitPreview();
+        Salt.TextChanged += (_, _) => UpdateNutritionUnitPreview();
+        Fat.TextChanged += (_, _) => UpdateNutritionUnitPreview();
         UpdateNutritionUnitPreview();
     }
 
@@ -208,12 +210,7 @@ public partial class MainWindow
         if (!RequireVerifiedEmail()) return;
         var document = LabelStudioWindow.LoadDocument(GetDatabasePath(),
             ParseMm(LabelWidthInput.Text, 70), ParseMm(LabelHeightInput.Text, 45));
-        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        if (ProductsGrid.SelectedItem is ProductRow selected)
-        {
-            foreach (var name in new[] { "English", "Sinhala", "Tamil", "Mfd", "Expiry", "Batch", "NetWeight", "Sugar", "Salt", "Fat", "Mrp", "Importer" })
-                values[name] = Convert.ToString(typeof(ProductRow).GetProperty(name)?.GetValue(selected), CultureInfo.InvariantCulture) ?? "";
-        }
+        var values = BuildStudioValues();
         var studio = new LabelStudioWindow(GetDatabasePath(), document, values) { Owner = this };
         studio.ShowDialog();
     }
@@ -223,15 +220,7 @@ public partial class MainWindow
         if (!RequireVerifiedEmail()) return;
         var document = LabelStudioWindow.LoadDocument(GetDatabasePath(),
             ParseMm(LabelWidthInput.Text, 70), ParseMm(LabelHeightInput.Text, 45));
-        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        if (ProductsGrid.SelectedItem is ProductRow selected)
-        {
-            foreach (var name in new[] { "English", "Sinhala", "Tamil", "Mfd", "Expiry", "Batch", "NetWeight", "Sugar", "Salt", "Fat", "Mrp", "Importer" })
-                values[name] = Convert.ToString(typeof(ProductRow).GetProperty(name)?.GetValue(selected), CultureInfo.InvariantCulture) ?? "";
-        }
-        values["SugarUnit"] = (SugarUnit.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "g/100g";
-        values["SaltUnit"] = (SaltUnit.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "g/100g";
-        values["FatUnit"] = (FatUnit.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "g/100g";
+        var values = BuildStudioValues();
         var width = LabelPaperSize.SelectedIndex switch { 1 => 148d, 2 => 215.9d, 3 => ParseMm(CustomPaperWidth.Text, 210), _ => 210d };
         var height = LabelPaperSize.SelectedIndex switch { 1 => 210d, 2 => 279.4d, 3 => ParseMm(CustomPaperHeight.Text, 297), _ => 297d };
         var preview = new LabelPrintPreviewWindow(document, values, width, height,
@@ -241,6 +230,24 @@ public partial class MainWindow
             Math.Max(1, int.TryParse(Copies.Text, out var copies) ? copies : 1));
         preview.Owner = this;
         preview.ShowDialog();
+    }
+
+    private Dictionary<string, string> BuildStudioValues()
+    {
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (ProductsGrid.SelectedItem is ProductRow selected)
+        {
+            foreach (var name in new[] { "English", "Sinhala", "Tamil", "Batch", "NetWeight", "Sugar", "Salt", "Fat", "Mrp", "Importer" })
+                values[name] = Convert.ToString(typeof(ProductRow).GetProperty(name)?.GetValue(selected), CultureInfo.InvariantCulture) ?? "";
+            values["Mfd"] = selected.PrintMfd ? "Printed on Pack" : selected.Mfd;
+            values["Expiry"] = selected.PrintExpiry ? "Printed on Pack" : selected.Expiry;
+            values["Batch"] = selected.PrintBatch ? "Printed on Pack" : selected.Batch;
+            values["NetWeight"] = selected.PrintNetWeight ? "Printed on Pack" : selected.NetWeight;
+        }
+        values["SugarUnit"] = (SugarUnit.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "g/100g";
+        values["SaltUnit"] = (SaltUnit.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "g/100g";
+        values["FatUnit"] = (FatUnit.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "g/100g";
+        return values;
     }
 
     private static double ParseMm(string value, double fallback) =>
@@ -424,7 +431,6 @@ internal sealed class LabelStudioWindow : Window
         _color.SelectedItem = element?.Color;
         _bold.IsChecked = element?.Bold == true;
         _layers.SelectedItem = element;
-        RenderCanvas(false);
     }
     private void SelectedTextChanged(object? sender, TextChangedEventArgs e)
     {
@@ -496,7 +502,7 @@ internal sealed class LabelStudioWindow : Window
                     _y.Text = element.Y.ToString("0.##", CultureInfo.InvariantCulture);
                 }
             };
-            visual.MouseLeftButtonUp += (_, _) => { if (visual.IsMouseCaptured) visual.ReleaseMouseCapture(); };
+            visual.MouseLeftButtonUp += (_, _) => { if (visual.IsMouseCaptured) visual.ReleaseMouseCapture(); RenderCanvas(false); };
             _canvas.Children.Add(visual);
         }
         var overflow = _document.Elements.Count(e => e.X < 0 || e.Y < 0 || e.X + e.Width > _document.WidthMm || e.Y + e.Height > _document.HeightMm);
@@ -606,6 +612,8 @@ internal sealed class LabelPrintPreviewWindow : Window
         {
             var dialog = new PrintDialog();
             if (dialog.ShowDialog() != true) return;
+            try { dialog.PrintTicket.PageMediaSize = new PageMediaSize(paperW, paperH); }
+            catch { MessageBox.Show(this, "The selected printer driver may not support this custom page size. Check printer properties before printing.", "Paper size warning", MessageBoxButton.OK, MessageBoxImage.Warning); }
             dialog.PrintDocument(_fixedDocument.DocumentPaginator, "RSS Label Maker labels");
         };
         var root = new DockPanel();
