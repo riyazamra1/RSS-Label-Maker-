@@ -28,7 +28,7 @@ jobs:
         run: dotnet restore RSS.LabelMaker.sln
 
       - name: Build Release
-        run: dotnet build RSS.LabelMaker.sln --configuration Release --no-restore -p:Version=${{ github.ref_name && github.ref_name != '' && startsWith(github.ref_name, 'v') && github.ref_name != 'v' && github.ref_name || 'v1.0.1' }}
+        run: dotnet build RSS.LabelMaker.sln --configuration Release --no-restore
 
       - name: Publish Windows x64
         shell: pwsh
