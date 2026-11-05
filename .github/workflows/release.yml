@@ -4,6 +4,13 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (for example 1.0.1)"
+        required: true
+        default: "1.0.1"
+        type: string
 
 permissions:
   contents: write
@@ -61,6 +68,8 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ env.RLM_VERSION }}
+          target_commitish: ${{ github.sha }}
           generate_release_notes: true
           files: |
             artifacts/RSS-Label-Maker-win-x64.zip
