@@ -235,8 +235,16 @@ internal sealed class AccountWindow : Window
         {
             stack.Children.Add(new Border { Background = Brush("#FFF4D6"), CornerRadius = new CornerRadius(6), Padding = new Thickness(12), Child = new TextBlock { Text = "EMAIL NOT VERIFIED — You can enter the dashboard, but creating, editing and printing labels are locked until you verify your email.", TextWrapping = TextWrapping.Wrap, Foreground = Brush("#76520C") } });
             var resend = new Button { Content = "Resend verification email", Height = 38, Margin = new Thickness(0, 12, 0, 0) };
-            resend.Click += async (_, _) => { try { _status.Text = await RssCoreAccountClient.ResendVerificationAsync(session.Email); } catch (Exception ex) { _status.Text = ex.Message; } };
+            var verificationStatus = new TextBlock { TextWrapping = TextWrapping.Wrap, Foreground = Brush("#68717D"), Margin = new Thickness(0, 8, 0, 0) };
+            resend.Click += async (_, _) =>
+            {
+                resend.IsEnabled = false;
+                try { verificationStatus.Text = await RssCoreAccountClient.ResendVerificationAsync(session.Email); }
+                catch (Exception ex) { verificationStatus.Text = ex.Message; }
+                finally { resend.IsEnabled = true; }
+            };
             stack.Children.Add(resend);
+            stack.Children.Add(verificationStatus);
         }
         else
         {
