@@ -4,7 +4,7 @@
 **Publisher:** Razeen Secure Solution  
 **Repository:** riyazamra1/RSS-Label-Maker-  
 **Target OS:** Windows 10 and Windows 11  
-**Distribution:** Free standalone desktop application  
+**Distribution:** Licensed Windows desktop application with a mandatory RSS Core account  
 **Specification status:** Approved requirements baseline  
 **Version target:** 1.0.0
 
@@ -19,9 +19,14 @@ The reference is a layout guide, not a fixed-size template. Users must be able t
 - Native Windows desktop application; not a WebView wrapper.
 - C# / .NET 10 LTS / WPF.
 - SQLite local database.
-- Core label creation, editing, design, preview and printing are free standalone features; no account, activation or RSS Core requirement.
+- An RSS Core account is mandatory to enter RSS Label Maker. Registration and sign-in are required; the account session is validated online.
+- Email verification is mandatory to unlock product creation, label editing/design changes and printing. An unverified account may sign in and enter the dashboard, view dashboard information and resend the verification email, but all label-changing and print operations remain locked.
+- There is no permanent Free plan. New eligible accounts receive one 14-day trial. After the trial expires, label operations require an active paid licence.
+- Supported licence choices: 14-day Premium trial, Premium Single PC, Premium Multiple PC (individual) and Premium Shared Users (network). Licence/device limits are enforced by RSS Core.
+- Forgot Password is required and must be fully functional through RSS Core email recovery: six-digit code, ten-minute expiry, maximum five verification attempts, single-use reset authorization, and password change that revokes existing sessions.
+- Core account registration, verification, sign-in, password recovery and licence checks require an internet connection. An unavailable account service must not silently grant access to protected label operations.
 - Automatic English-to-Sinhala and English-to-Tamil product-name transliteration is a premium online feature with five free uses per installation/account allowance; after the five free uses, an active Premium subscription is required.
-- Manual Sinhala and Tamil product-name entry remains free and available offline, without an account or subscription.
+- Manual Sinhala and Tamil product-name entry does not require the transliteration Premium entitlement; after account sign-in and email verification, it is available within the active licence.
 - Any printer installed and usable through the Windows printing subsystem.
 - Normal product management, design, preview and printing must work offline.
 - Online translation is used only to generate Sinhala and Tamil product-name suggestions from an English product name. Translation results are cached locally.
@@ -202,10 +207,10 @@ Access rules:
 - Provide five successful automatic transliteration uses free of charge.
 - After the five free uses are consumed, require an active Premium subscription before making further automatic transliteration requests.
 - Failed network/provider requests must not consume a free use.
-- The Premium gate applies only to automatic English-to-Sinhala/Tamil transliteration. It must not restrict manual Sinhala/Tamil entry or editing, product management, label design, templates, preview, export or printing.
-- Manual Sinhala and Tamil entry remains available offline and free.
+- The transliteration Premium gate applies to automatic English-to-Sinhala/Tamil transliteration. Separately, the account verification and active-licence gates apply to product management, label design, templates, preview, export and printing.
+- Manual Sinhala and Tamil entry does not consume transliteration allowances; it remains available offline while the account has an active licence and verified email.
 - Automatic transliteration requires an internet connection. If offline, retain cached results and allow manual entry/editing.
-- Do not require sign-in or RSS Core for ordinary offline label-making workflows. Any subscription verification must be isolated to the automatic transliteration feature and fail gracefully without blocking the rest of the application.
+- Require an RSS Core account session to launch the dashboard. Cache only the protected session token using Windows DPAPI; revalidate the session with RSS Core at application startup. If RSS Core cannot validate the session, do not enter the application workspace.
 
 Transliteration behaviour:
 - User explicitly requests transliteration or accepts a transliteration prompt; never send a request on every keystroke.
@@ -253,7 +258,7 @@ Requirements:
 - Transaction-safe writes.
 - Backup and restore.
 - Safe migration/backup strategy.
-- No mandatory cloud database or user account.
+- RSS Core is the authoritative account, email-verification and licence service. Local product/design data remains in SQLite.
 
 ## 14. UX and branding
 
@@ -267,14 +272,14 @@ Requirements:
 
 ## 15. Non-functional requirements
 
-- Product creation, editing, design, preview and printing work without internet.
+- Previously saved dashboard data may be viewed locally, but account session and licence validation require internet at launch. Label creation, editing and printing require a verified email and an active licence.
 - Automatic English-to-Sinhala/Tamil transliteration requires internet and is Premium-gated after five successful free uses; manual Sinhala/Tamil entry remains free and offline.
 - Avoid data loss; autosave drafts or provide clear save state.
 - No silent text clipping, label overlap or page scaling.
 - Stable operation with large product lists and bulk jobs.
 - Logging for diagnostics without recording translation credentials or sensitive secrets.
 - Installer and application must support the declared Windows 10/11 target; validate actual OS/runtime requirements during build.
-- Core label-making remains free standalone use with no forced sign-in or RSS Core connection. Premium entitlement checks apply only to automatic transliteration after the five-use free allowance.
+- There is no permanent Free licence. A new account receives a 14-day Premium trial; after expiry, an active paid licence is required for label operations. RSS Core is authoritative for account, email verification, licence and device entitlement.
 
 ### 15.1 Automatic application updates and session recovery
 
