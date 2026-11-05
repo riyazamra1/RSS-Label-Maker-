@@ -128,6 +128,7 @@ public partial class MainWindow : Window
                         var account = new AccountWindow { Owner = this };
                         account.ShowDialog();
                         await RefreshAccountButtonAsync();
+                        if (_accountSession is null) Close();
                     };
                     existingRightPanel.Children.Insert(0, _accountButton);
                 }
@@ -816,7 +817,11 @@ public partial class MainWindow : Window
 
     private void ShowPage(string page)
     {
-        if (page != "Dashboard" && _accountSession?.EmailVerified != true)
+        if (page != "Dashboard" && _accountSession is null)
+        {
+            page = "Dashboard";
+        }
+        else if (page != "Dashboard" && _accountSession.EmailVerified != true)
         {
             RequireVerifiedEmail();
             return;
