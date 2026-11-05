@@ -996,6 +996,34 @@ public partial class MainWindow : Window
         catch (Exception ex) { ProductStatus.Text = $"Product was not saved: {ex.Message}"; }
     }
 
+    private void DeleteProduct_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireVerifiedEmail()) return;
+        if (sender is not Button { DataContext: ProductRow product } || product.Id <= 0) return;
+        var answer = MessageBox.Show(this,
+            $"Delete product '{product.English}'? This cannot be undone.",
+            "Confirm product deletion", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        if (answer != MessageBoxResult.Yes) return;
+        try
+        {
+            using var connection = new SqliteConnection($"Data Source={GetDatabasePath()}");
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "DELETE FROM Products WHERE Id = $id;";
+            command.Parameters.AddWithValue("$id", product.Id);
+            var affected = command.ExecuteNonQuery();
+            if (_editingProductId == product.Id)
+            {
+                _editingProductId = null;
+                SaveProductButton.Content = "Save Product";
+                ProductStatus.Text = "The edited product was deleted.";
+            }
+            LoadProducts();
+            ProductStatus.Text = affected == 1 ? $"Deleted '{product.English}'." : "Product was not found.";
+        }
+        catch (Exception ex) { ProductStatus.Text = $"Delete failed: {ex.Message}"; }
+    }
+
     private void EditProduct_Click(object sender, RoutedEventArgs e)
     {
         if (!RequireVerifiedEmail()) return;
