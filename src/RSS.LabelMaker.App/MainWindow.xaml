@@ -2,7 +2,7 @@
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
  Title="RSS Label Maker" Height="850" Width="1440" MinHeight="720" MinWidth="1120"
- WindowStartupLocation="CenterScreen" Background="#F5F6F8">
+ WindowStartupLocation="CenterScreen" Background="#F5F6F8" Loaded="MainWindow_AdvancedLoaded">
  <Grid>
   <Grid.ColumnDefinitions><ColumnDefinition Width="238"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
   <Border Grid.Column="0" Background="#20242B">
@@ -87,7 +87,7 @@
        <Grid>
         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
         <StackPanel Grid.Column="0" Margin="0,0,12,0"><TextBlock Text="Category (required)" FontSize="11" Margin="0,0,0,5"/><ComboBox x:Name="ProductCategory" SelectedIndex="0" Padding="6"><ComboBoxItem Content="Food &amp; Beverage"/><ComboBoxItem Content="Grocery &amp; Staples"/><ComboBoxItem Content="Health &amp; Pharmaceuticals"/><ComboBoxItem Content="Beauty &amp; Personal Care"/><ComboBoxItem Content="Household &amp; Cleaning"/><ComboBoxItem Content="Electronics"/><ComboBoxItem Content="Clothing &amp; Textiles"/><ComboBoxItem Content="Stationery &amp; Office"/><ComboBoxItem Content="Other"/></ComboBox></StackPanel>
-        <StackPanel Grid.Column="1" Margin="0,0,12,0"><TextBlock Text="Product name (English)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="EnglishName" /></StackPanel>
+        <StackPanel Grid.Column="1" Margin="0,0,12,0"><TextBlock Text="Product name (English)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="EnglishName" /><Button Content="Auto Sinhala + Tamil" Click="TransliterateBoth_Click" Margin="0,5,0,0" Padding="7,4"/></StackPanel>
         <StackPanel Grid.Column="2" Margin="0,0,12,0"><TextBlock Text="Product name (Sinhala)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="SinhalaName"/></StackPanel>
         <StackPanel Grid.Column="3"><TextBlock Text="Product name (Tamil)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="TamilName"/></StackPanel>
        </Grid>
@@ -100,9 +100,9 @@
        </Grid>
        <Grid Margin="0,12,0,0">
         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-        <StackPanel Grid.Column="0" Margin="0,0,10,0"><TextBlock Text="Sugar (g/100g)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="Sugar"/></StackPanel>
-        <StackPanel Grid.Column="1" Margin="0,0,10,0"><TextBlock Text="Salt (g/100g)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="Salt"/></StackPanel>
-        <StackPanel Grid.Column="2" Margin="0,0,10,0"><TextBlock Text="Fat (g/100g)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="Fat"/></StackPanel>
+        <StackPanel Grid.Column="0" Margin="0,0,10,0"><TextBlock Text="Sugar (g/100g)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="Sugar"/><ComboBox x:Name="SugarUnit" SelectedIndex="0" Margin="0,4,0,0" SelectionChanged="NutritionUnit_Changed"><ComboBoxItem Content="g/100g"/><ComboBoxItem Content="mg/100g"/><ComboBoxItem Content="l/100g"/></ComboBox></StackPanel>
+        <StackPanel Grid.Column="1" Margin="0,0,10,0"><TextBlock Text="Salt (g/100g)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="Salt"/><ComboBox x:Name="SaltUnit" SelectedIndex="0" Margin="0,4,0,0" SelectionChanged="NutritionUnit_Changed"><ComboBoxItem Content="g/100g"/><ComboBoxItem Content="mg/100g"/><ComboBoxItem Content="l/100g"/></ComboBox></StackPanel>
+        <StackPanel Grid.Column="2" Margin="0,0,10,0"><TextBlock Text="Fat (g/100g)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="Fat"/><ComboBox x:Name="FatUnit" SelectedIndex="0" Margin="0,4,0,0" SelectionChanged="NutritionUnit_Changed"><ComboBoxItem Content="g/100g"/><ComboBoxItem Content="mg/100g"/><ComboBoxItem Content="l/100g"/></ComboBox></StackPanel>
         <StackPanel Grid.Column="3"><TextBlock Text="M.R.P. (Rs.)" FontSize="11" Margin="0,0,0,5"/><TextBox x:Name="Mrp"/></StackPanel>
        </Grid>
        <Grid Margin="0,12,0,0">
@@ -142,7 +142,7 @@
        <TextBlock Text="Label height (mm)" FontSize="11"/><TextBox x:Name="LabelHeightInput" Text="45" Margin="0,5,0,12"/>
        <TextBlock Text="Paper" FontSize="11"/><ComboBox x:Name="LabelPaperSize" SelectedIndex="0" Margin="0,5,0,8"><ComboBoxItem Content="A4 — 210 × 297 mm"/><ComboBoxItem Content="A5 — 148 × 210 mm"/><ComboBoxItem Content="Letter — 215.9 × 279.4 mm"/><ComboBoxItem Content="Custom"/></ComboBox><Grid Margin="0,0,0,10"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><StackPanel Margin="0,0,5,0"><TextBlock Text="Custom width (mm)" FontSize="10"/><TextBox x:Name="CustomPaperWidth" Text="210"/></StackPanel><StackPanel Grid.Column="1" Margin="5,0,0,0"><TextBlock Text="Custom height (mm)" FontSize="10"/><TextBox x:Name="CustomPaperHeight" Text="297"/></StackPanel></Grid><TextBlock Text="Margins (mm): Top / Right / Bottom / Left" FontSize="10"/><Grid Margin="0,4,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBox x:Name="MarginTopInput" Text="5" Margin="0,0,3,0"/><TextBox x:Name="MarginRightInput" Grid.Column="1" Text="5" Margin="3,0"/><TextBox x:Name="MarginBottomInput" Grid.Column="2" Text="5" Margin="3,0"/><TextBox x:Name="MarginLeftInput" Grid.Column="3" Text="5" Margin="3,0,0,0"/></Grid><TextBlock Text="Gaps (mm): Horizontal / Vertical" FontSize="10"/><Grid Margin="0,4,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBox x:Name="GapHorizontalInput" Text="3" Margin="0,0,3,0"/><TextBox x:Name="GapVerticalInput" Grid.Column="1" Text="3" Margin="3,0,0,0"/></Grid>
        <TextBlock Text="Layout" FontSize="11"/><ComboBox SelectedIndex="0" Margin="0,5,0,12"><ComboBoxItem Content="Automatic rows &amp; columns"/><ComboBoxItem Content="Manual rows &amp; columns"/></ComboBox>
-       <Button Content="Apply dimensions" Click="ApplyLayout_Click" Background="#C69A43" Margin="0,8,0,0"/>
+       <Button Content="Apply dimensions" Click="ApplyLayout_Click" Background="#C69A43" Margin="0,8,0,0"/><Button Content="Open full editable canvas designer" Click="OpenCanvasStudio_Click" Background="#20242B" Foreground="White" Margin="0,8,0,0" Padding="8,7"/><Button Content="Print preview / Print labels" Click="PrintPreview_Click" Background="#C69A43" Margin="0,6,0,0" Padding="8,7"/>
        <TextBlock x:Name="LayoutStatus" Text="A4 sheet · Actual size preview" Foreground="#77808C" FontSize="10" TextWrapping="Wrap" Margin="0,12,0,0"/>
       </StackPanel>
      </Border>
