@@ -831,6 +831,12 @@ public partial class MainWindow : Window
         public bool IsMaximized { get; set; }
     }
 
+    private void CloseApplication_Click(object sender, RoutedEventArgs e)
+    {
+        SaveSessionSnapshot();
+        Close();
+    }
+
     private void Nav_Click(object sender, RoutedEventArgs e)
     {
         if (sender is Button button && button.Tag is string page)
