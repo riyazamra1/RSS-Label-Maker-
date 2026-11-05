@@ -1,8 +1,8 @@
 name: RSS Label Maker Windows Build
 
 on:
-  pull_request:
-    branches: [main]
+  push:
+    branches: [feature/account-verification-password-recovery]
     paths:
       - "src/**"
       - "*.sln"
@@ -13,8 +13,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: rlm-windows-build-${{ github.ref }}
-  cancel-in-progress: true
+  group: rlm-windows-build-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
   build:
