@@ -16,12 +16,15 @@ internal static class UpdateService
     private const string ChecksumAsset = "RSS-Label-Maker-win-x64.zip.sha256";
     private const string ExecutableName = "RSS.LabelMaker.exe";
 
-    public static async Task<StagedUpdate?> CheckAndStageAsync(CancellationToken cancellationToken = default)
+    public static string GetCurrentVersion() => System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "1.0.0";
+
+    public static async Task<StagedUpdate?> CheckAndStageAsync(IProgress<string>? progress = null, CancellationToken cancellationToken = default)
     {
         using var client = new HttpClient();
         client.DefaultRequestHeaders.UserAgent.ParseAdd("RSS-Label-Maker-Updater/1.1");
         client.Timeout = TimeSpan.FromMinutes(10);
 
+        progress?.Report("Checking the latest stable GitHub Release…");
         using var response = await client.GetAsync(ReleasesApi, cancellationToken);
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
         response.EnsureSuccessStatusCode();
@@ -66,7 +69,9 @@ internal static class UpdateService
 
         try
         {
+            progress?.Report($"Downloading RSS Label Maker {latest}…");
             await DownloadAsync(client, packageUrl, partialPackage, cancellationToken);
+            progress?.Report("Downloading update checksum…");
             await DownloadAsync(client, checksumUrl, partialChecksum, cancellationToken);
             var checksumText = await File.ReadAllTextAsync(partialChecksum, cancellationToken);
             var expectedHash = checksumText.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
@@ -75,12 +80,14 @@ internal static class UpdateService
                 !expectedHash.All(Uri.IsHexDigit))
                 throw new InvalidDataException("The release checksum file is invalid.");
 
+            progress?.Report("Verifying update package integrity…");
             await using var packageStream = File.OpenRead(partialPackage);
             var actualHash = Convert.ToHexString(await SHA256.HashDataAsync(packageStream, cancellationToken));
             if (!CryptographicOperations.FixedTimeEquals(
                     Convert.FromHexString(expectedHash), Convert.FromHexString(actualHash)))
                 throw new InvalidDataException("The downloaded update failed SHA-256 integrity verification.");
 
+            progress?.Report("Update verified. Preparing the safe installation…");
             File.Move(partialPackage, packagePath, true);
             File.Move(partialChecksum, checksumPath, true);
             return new StagedUpdate(latest.ToString(), current.ToString(), packagePath, releaseNotes);
