@@ -727,6 +727,10 @@ public partial class MainWindow : Window
                 LabelWidth = LabelWidthInput.Text,
                 LabelHeight = LabelHeightInput.Text,
                 PaperIndex = LabelPaperSize.SelectedIndex,
+                CustomPaperWidth = CustomPaperWidth.Text, CustomPaperHeight = CustomPaperHeight.Text,
+                MarginTop = MarginTopInput.Text, MarginRight = MarginRightInput.Text,
+                MarginBottom = MarginBottomInput.Text, MarginLeft = MarginLeftInput.Text,
+                GapHorizontal = GapHorizontalInput.Text, GapVertical = GapVerticalInput.Text,
                 SelectedProductIndex = ProductsGrid.SelectedIndex,
                 WindowWidth = Width,
                 WindowHeight = Height,
@@ -778,6 +782,11 @@ public partial class MainWindow : Window
             LabelHeightInput.Text = snapshot.LabelHeight;
             if (snapshot.PaperIndex >= 0 && snapshot.PaperIndex < LabelPaperSize.Items.Count)
                 LabelPaperSize.SelectedIndex = snapshot.PaperIndex;
+            CustomPaperWidth.Text = snapshot.CustomPaperWidth;
+            CustomPaperHeight.Text = snapshot.CustomPaperHeight;
+            MarginTopInput.Text = snapshot.MarginTop; MarginRightInput.Text = snapshot.MarginRight;
+            MarginBottomInput.Text = snapshot.MarginBottom; MarginLeftInput.Text = snapshot.MarginLeft;
+            GapHorizontalInput.Text = snapshot.GapHorizontal; GapVerticalInput.Text = snapshot.GapVertical;
             if (snapshot.SelectedProductIndex >= 0 && snapshot.SelectedProductIndex < ProductsGrid.Items.Count)
                 ProductsGrid.SelectedIndex = snapshot.SelectedProductIndex;
             if (snapshot.WindowWidth >= MinWidth && snapshot.WindowWidth <= 10000) Width = snapshot.WindowWidth;
@@ -827,6 +836,14 @@ public partial class MainWindow : Window
         public string LabelWidth { get; set; } = "70";
         public string LabelHeight { get; set; } = "45";
         public int PaperIndex { get; set; }
+        public string CustomPaperWidth { get; set; } = "210";
+        public string CustomPaperHeight { get; set; } = "297";
+        public string MarginTop { get; set; } = "5";
+        public string MarginRight { get; set; } = "5";
+        public string MarginBottom { get; set; } = "5";
+        public string MarginLeft { get; set; } = "5";
+        public string GapHorizontal { get; set; } = "3";
+        public string GapVertical { get; set; } = "3";
         public int SelectedProductIndex { get; set; } = -1;
         public double WindowWidth { get; set; }
         public double WindowHeight { get; set; }
