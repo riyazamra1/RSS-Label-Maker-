@@ -177,14 +177,16 @@
     </Grid>
     <!-- Templates -->
     <Grid x:Name="TemplatesPage" Visibility="Collapsed">
-     <StackPanel>
-      <TextBlock Text="BUILT-IN TEMPLATES" FontSize="11" FontWeight="Bold" Foreground="#77808C" Margin="0,0,0,14"/>
-      <UniformGrid Columns="3">
-       <Border Background="White" CornerRadius="8" Padding="20" Margin="0,0,12,0"><StackPanel><TextBlock Text="FOOD PRODUCT LABEL" FontWeight="Bold"/><TextBlock Text="Reference-style food label with Sugar, Salt and Fat panels." TextWrapping="Wrap" Foreground="#77808C" Margin="0,8,0,18"/><Button Content="Open in Designer" Click="OpenDesigner_Click" Background="#F8F2E6"/></StackPanel></Border>
-       <Border Background="White" CornerRadius="8" Padding="20" Margin="0,0,12,0"><StackPanel><TextBlock Text="GENERAL PRODUCT LABEL" FontWeight="Bold"/><TextBlock Text="Flexible product information and branding layout." TextWrapping="Wrap" Foreground="#77808C" Margin="0,8,0,18"/><Button Content="Open in Designer" Click="OpenDesigner_Click"/></StackPanel></Border>
-       <Border Background="White" CornerRadius="8" Padding="20"><StackPanel><TextBlock Text="BARCODE &amp; PRICE LABEL" FontWeight="Bold"/><TextBlock Text="Compact product identification and price layout." TextWrapping="Wrap" Foreground="#77808C" Margin="0,8,0,18"/><Button Content="Open in Designer" Click="OpenDesigner_Click"/></StackPanel></Border>
-      </UniformGrid>
-     </StackPanel>
+     <Border Background="White" CornerRadius="8" Padding="22">
+      <StackPanel>
+       <TextBlock Text="SAVED LABEL LAYOUT PRESETS" FontSize="16" FontWeight="Bold"/>
+       <TextBlock Text="Save and reuse physical label dimensions, paper profile, margins and gaps. Full editable canvas-element templates are still being developed." Foreground="#77808C" TextWrapping="Wrap" Margin="0,8,0,16"/>
+       <TextBlock Text="Preset name" FontSize="11"/><TextBox x:Name="TemplateNameInput" Margin="0,4,0,12" MaxWidth="420" HorizontalAlignment="Left"/>
+       <WrapPanel><Button Content="Save Current Layout" Click="SaveTemplate_Click" Background="#C69A43" Padding="14,8" Margin="0,0,8,0"/><Button Content="Load Selected" Click="LoadTemplate_Click" Padding="14,8" Margin="0,0,8,0"/><Button Content="Delete Selected" Click="DeleteTemplate_Click" Padding="14,8"/></WrapPanel>
+       <ListBox x:Name="SavedTemplatesList" DisplayMemberPath="Name" Height="240" Margin="0,16,0,0"/>
+       <TextBlock x:Name="TemplateStatus" Foreground="#4E7B5C" TextWrapping="Wrap" Margin="0,10,0,0"/>
+      </StackPanel>
+     </Border>
     </Grid>
     <!-- Print manager -->
     <Grid x:Name="PrintPage" Visibility="Collapsed">
