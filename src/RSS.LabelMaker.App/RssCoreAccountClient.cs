@@ -31,7 +31,7 @@ internal static class RssCoreAccountClient
         using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
         if (!response.IsSuccessStatusCode)
             throw new InvalidOperationException(ReadError(document.RootElement, "Registration failed."));
-        var required = document.RootElement.TryGetProperty("email_verification_required", out var value) && value.GetBoolean();
+        var required = (document.RootElement.TryGetProperty("email_verification_required", out var value) || document.RootElement.TryGetProperty("verification_required", out value)) && value.ValueKind == JsonValueKind.True;
         return required
             ? "Registration received. Open the verification email sent to your inbox, then return here and sign in. The link expires in 24 hours."
             : "Your RSS account is ready. You can now sign in.";
