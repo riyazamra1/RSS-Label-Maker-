@@ -962,7 +962,9 @@ public partial class MainWindow : Window
             }
             else
             {
-                var insertedId = connection.LastInsertRowId;
+                using var idCommand = connection.CreateCommand();
+                idCommand.CommandText = "SELECT last_insert_rowid();";
+                var insertedId = Convert.ToInt64(idCommand.ExecuteScalar(), CultureInfo.InvariantCulture);
                 _products.Insert(0, product with { Id = insertedId });
                 ProductStatus.Text = "Product saved to the local SQLite database.";
             }
