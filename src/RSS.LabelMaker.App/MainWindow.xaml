@@ -125,7 +125,7 @@
          <DataGridTextColumn Header="Tamil" Binding="{Binding Tamil}" Width="*"/>
          <DataGridTextColumn Header="Batch" Binding="{Binding Batch}" Width="*"/>
          <DataGridTextColumn Header="M.R.P. (Rs.)" Binding="{Binding Mrp}" Width="*"/>
-         <DataGridTemplateColumn Header="Actions" Width="90"><DataGridTemplateColumn.CellTemplate><DataTemplate><Button Content="Edit" Click="EditProduct_Click" Padding="8,4"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+         <DataGridTemplateColumn Header="Actions" Width="150"><DataGridTemplateColumn.CellTemplate><DataTemplate><StackPanel Orientation="Horizontal"><Button Content="Edit" Click="EditProduct_Click" Padding="8,4" Margin="0,0,5,0"/><Button Content="Delete" Click="DeleteProduct_Click" Padding="8,4" Background="#FCE8E8" Foreground="#A52A2A"/></StackPanel></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
         </DataGrid.Columns>
        </DataGrid>
       </DockPanel>
