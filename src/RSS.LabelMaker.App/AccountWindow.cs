@@ -249,7 +249,7 @@ internal sealed class AccountWindow : Window
         proceed.Click += (_, _) => { DialogResult = true; Close(); };
         stack.Children.Add(proceed);
         var signOut = new Button { Content = "Sign out", Height = 36, Margin = new Thickness(0, 8, 0, 0), Background = Brush("#F0F1F3") };
-        signOut.Click += async (_, _) => { await RssCoreAccountClient.SignOutAsync(); _root.Children.Clear(); _root.Children.Add(card); _authPanel.Visibility = Visibility.Visible; _recoveryPanel.Visibility = Visibility.Collapsed; SetMode(false); };
+        signOut.Click += async (_, _) => { await RssCoreAccountClient.SignOutAsync(); DialogResult = false; Close(); };
         stack.Children.Add(signOut);
         _root.Children.Add(card);
         Title = "RSS Account";
