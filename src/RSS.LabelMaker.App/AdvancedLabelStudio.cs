@@ -566,7 +566,7 @@ internal sealed class LabelStudioWindow : Window
         var overflow = _document.Elements.Count(e => e.X < 0 || e.Y < 0 || e.X + e.Width > _document.WidthMm || e.Y + e.Height > _document.HeightMm);
         Title = overflow == 0 ? "RSS Label Maker — Full Canvas Designer" : $"RSS Label Maker — Designer ({overflow} overflow warning(s))";
     }
-    private static BitmapImage LoadImage(string base64)
+    internal static BitmapImage LoadImage(string base64)
     {
         var bytes = Convert.FromBase64String(base64);
         using var stream = new MemoryStream(bytes);
@@ -655,7 +655,7 @@ internal sealed class LabelPrintPreviewWindow : Window
                     }
                     if (element.Kind == "image")
                     {
-                        var image = new Image { Source = LoadImage(element.ImageBase64), Width = element.Width * DipPerMm, Height = element.Height * DipPerMm, Stretch = Stretch.Uniform };
+                        var image = new Image { Source = LabelStudioWindow.LoadImage(element.ImageBase64), Width = element.Width * DipPerMm, Height = element.Height * DipPerMm, Stretch = Stretch.Uniform };
                         Canvas.SetLeft(image, element.X * DipPerMm);
                         Canvas.SetTop(image, element.Y * DipPerMm);
                         label.Children.Add(image);
