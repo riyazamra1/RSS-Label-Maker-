@@ -8,7 +8,7 @@ using System.Text.Json;
 
 namespace RSS.LabelMaker.App;
 
-internal sealed record RssAccountSession(string Id, string Email, string Name, string AppKey, string Plan, string LicenseStatus, string? ExpiresAt);
+internal sealed record RssAccountSession(string Id, string Email, string Name, bool EmailVerified, string AppKey, string Plan, string LicenseStatus, string? ExpiresAt);
 
 internal static class RssCoreAccountClient
 {
@@ -47,6 +47,42 @@ internal static class RssCoreAccountClient
         if (!response.IsSuccessStatusCode)
             throw new InvalidOperationException(ReadError(document.RootElement, "Unable to resend verification email."));
         return "If this account still needs verification, a new verification email has been sent.";
+    }
+
+    public static async Task<string> RequestPasswordResetAsync(string email)
+    {
+        using var response = await Http.PostAsJsonAsync(ApiBase + "forgot-password", new { email, project_key = ProjectKey });
+        using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException(ReadError(document.RootElement, "Unable to request a password reset."));
+        return document.RootElement.TryGetProperty("message", out var message)
+            ? message.GetString() ?? "If an account exists, a reset code has been sent."
+            : "If an account exists, a reset code has been sent.";
+    }
+
+    public static async Task<string> VerifyPasswordResetCodeAsync(string email, string code)
+    {
+        using var response = await Http.PostAsJsonAsync(ApiBase + "verify-password-reset", new { email, code, project_key = ProjectKey });
+        using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException(ReadError(document.RootElement, "Reset code verification failed."));
+        if (!document.RootElement.TryGetProperty("reset_token", out var token) || string.IsNullOrWhiteSpace(token.GetString()))
+            throw new InvalidOperationException("RSS Core did not authorize the password reset.");
+        return token.GetString()!;
+    }
+
+    public static async Task<string> ResetPasswordAsync(string email, string resetToken, string newPassword)
+    {
+        using var response = await Http.PostAsJsonAsync(ApiBase + "reset-password", new
+        {
+            email, reset_token = resetToken, new_password = newPassword, project_key = ProjectKey
+        });
+        using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException(ReadError(document.RootElement, "Password reset failed."));
+        return document.RootElement.TryGetProperty("message", out var message)
+            ? message.GetString() ?? "Password changed. Sign in with your new password."
+            : "Password changed. Sign in with your new password.";
     }
 
     public static async Task<RssAccountSession> LoginAsync(string email, string password)
@@ -105,6 +141,7 @@ internal static class RssCoreAccountClient
             user.GetProperty("id").ToString(),
             user.GetProperty("email").GetString() ?? "",
             user.TryGetProperty("name", out var name) ? name.GetString() ?? "" : "",
+            user.TryGetProperty("email_verified", out var verified) && verified.ValueKind == JsonValueKind.True,
             license.TryGetProperty("app_key", out var key) ? key.GetString() ?? "" : "",
             license.TryGetProperty("plan", out var plan) ? plan.GetString() ?? "" : "",
             license.TryGetProperty("status", out var status) ? status.GetString() ?? "" : "",
