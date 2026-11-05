@@ -37,8 +37,8 @@ Changing data in any tab updates the same live label preview immediately.
 - Keep both generated language fields visible, editable, and included in the live label preview. The user can correct either translation manually.
 - When the English source name changes, refresh translations that were previously auto-generated. Do not overwrite a Sinhala or Tamil field that the user has manually edited; preserve that manual value unless the user explicitly requests regeneration.
 - Show a clear pending/error state if automatic transliteration cannot complete. Never silently substitute the English text or erase an existing translation on failure.
-- Automatic English-to-Sinhala and English-to-Tamil transliteration follows the existing entitlement: five free automatic transliteration uses, then an active Premium subscription is required. Count usage according to the existing licensing rules and avoid charging/counting repeated background requests for the same unchanged English name.
-- Manual Sinhala and Tamil entry/editing remains free and available offline, including after the automatic transliteration allowance is exhausted.
+- Automatic English-to-Sinhala and English-to-Tamil transliteration is a Premium feature available during the 14-day Premium trial and with an active paid licence. There is no five-use free allowance and no Free plan.
+- Manual Sinhala and Tamil entry/editing remains available offline, but use of the application itself requires a valid 14-day trial or paid licence.
 - Save generated and manually edited language values with the product so they remain available offline and in Excel import/export.
 
 
@@ -139,7 +139,7 @@ The label preview must render the same document model used by print/PDF output. 
 Do not regress:
 - SQLite product persistence and existing data.
 - Account registration/sign-in and RSS Core licensing.
-- 14-day Premium trial and paid licence options; no permanent Free licence.
+- No Free plan or Free licence exists. The only trial is a 14-day Premium trial. After the 14-day trial expires, the user must purchase an applicable paid licence to continue using the software; never silently downgrade or convert the account to a permanent Free plan.
 - Automatic backup/sync and restore.
 - Automatic updates and session recovery.
 - English-to-Sinhala/Tamil automatic transliteration entitlement: five free uses, then Premium; manual local-language entry remains free and offline.
@@ -151,7 +151,7 @@ The redesign is not complete until:
 - The main Dashboard visually follows the supplied screenshot's composition and hierarchy.
 - Users can enter all product/company details from Dashboard tabs without navigating away.
 - Every input updates the live preview.
-- Entering an English product name automatically populates editable Sinhala and Tamil names under the existing five-free-uses-then-Premium entitlement; manual local-language entry remains free and offline.
+- Entering an English product name automatically populates editable Sinhala and Tamil names when the 14-day Premium trial or a paid licence is active. No Free plan or free transliteration allowance exists.
 - Units can be changed without changing the underlying physical dimensions.
 - Users can customize all four sheet margins and horizontal/vertical gaps.
 - Users can type a custom DPI value as well as select the 300/600/720 presets.
