@@ -213,12 +213,31 @@ public partial class MainWindow : Window
         dashboard.Children.Insert(0, _verificationBanner);
     }
 
+    private bool HasActiveLicense()
+    {
+        if (_accountSession is null || !string.Equals(_accountSession.LicenseStatus, "active", StringComparison.OrdinalIgnoreCase))
+            return false;
+        if (string.IsNullOrWhiteSpace(_accountSession.ExpiresAt)) return true;
+        return DateTimeOffset.TryParse(_accountSession.ExpiresAt, CultureInfo.InvariantCulture,
+            DateTimeStyles.AssumeUniversal, out var expiry) && expiry > DateTimeOffset.UtcNow;
+    }
+
+    private bool CanUseLabelFeatures() => _accountSession?.EmailVerified == true && HasActiveLicense();
+
     private void ApplyAccountAccess()
     {
-        var verified = _accountSession?.EmailVerified == true;
+        var allowed = CanUseLabelFeatures();
         if (_verificationBanner is not null)
-            _verificationBanner.Visibility = verified ? Visibility.Collapsed : Visibility.Visible;
-        if (!verified && new[] { "Products", "Designer", "Templates", "Print", "Import" }.Contains(_lastActivePage, StringComparer.Ordinal))
+        {
+            _verificationBanner.Visibility = allowed ? Visibility.Collapsed : Visibility.Visible;
+            if (_verificationBanner.Child is TextBlock message)
+            {
+                message.Text = _accountSession?.EmailVerified != true
+                    ? "EMAIL VERIFICATION REQUIRED — You can use the dashboard, but product creation, label editing and printing remain locked until you verify your email. Use My Account to resend the verification email."
+                    : "LICENCE EXPIRED OR INACTIVE — Your dashboard remains available, but label creation, editing and printing require an active RSS Label Maker licence.";
+            }
+        }
+        if (!allowed && new[] { "Products", "Designer", "Templates", "Print", "Import" }.Contains(_lastActivePage, StringComparer.Ordinal))
         {
             _lastActivePage = "Dashboard";
             ShowPage("Dashboard");
@@ -227,10 +246,12 @@ public partial class MainWindow : Window
 
     private bool RequireVerifiedEmail()
     {
-        if (_accountSession?.EmailVerified == true) return true;
-        MessageBox.Show(this,
-            "Please verify your RSS account email address first. You can still use the dashboard and resend the verification email from My Account.",
-            "Email Verification Required", MessageBoxButton.OK, MessageBoxImage.Information);
+        if (CanUseLabelFeatures()) return true;
+        var message = _accountSession?.EmailVerified != true
+            ? "Please verify your RSS account email address first. You can still use the dashboard and resend the verification email from My Account."
+            : "Your RSS Label Maker trial or licence is expired or inactive. An active licence is required to create, edit or print labels.";
+        MessageBox.Show(this, message, "RSS Label Maker Access Required",
+            MessageBoxButton.OK, MessageBoxImage.Information);
         ShowPage("Dashboard");
         return false;
     }
@@ -821,7 +842,7 @@ public partial class MainWindow : Window
         {
             page = "Dashboard";
         }
-        else if (page != "Dashboard" && _accountSession.EmailVerified != true)
+        else if (page != "Dashboard" && !CanUseLabelFeatures())
         {
             RequireVerifiedEmail();
             return;
