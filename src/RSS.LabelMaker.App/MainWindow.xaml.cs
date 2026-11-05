@@ -899,6 +899,7 @@ public partial class MainWindow : Window
             return;
         }
         _lastActivePage = page;
+        if (page == "Templates") RefreshSavedTemplates();
         DashboardPage.Visibility = page == "Dashboard" ? Visibility.Visible : Visibility.Collapsed;
         ProductsPage.Visibility = page == "Products" ? Visibility.Visible : Visibility.Collapsed;
         DesignerPage.Visibility = page == "Designer" ? Visibility.Visible : Visibility.Collapsed;
@@ -1021,6 +1022,104 @@ public partial class MainWindow : Window
         catch (Exception ex) { ProductStatus.Text = $"Product was not saved: {ex.Message}"; }
     }
 
+    private void SaveTemplate_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireVerifiedEmail()) return;
+        var name = TemplateNameInput.Text.Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            TemplateStatus.Text = "Enter a name for this layout preset.";
+            return;
+        }
+        var data = new LayoutTemplateData
+        {
+            LabelWidth = LabelWidthInput.Text, LabelHeight = LabelHeightInput.Text,
+            PaperIndex = LabelPaperSize.SelectedIndex,
+            CustomPaperWidth = CustomPaperWidth.Text, CustomPaperHeight = CustomPaperHeight.Text,
+            MarginTop = MarginTopInput.Text, MarginRight = MarginRightInput.Text,
+            MarginBottom = MarginBottomInput.Text, MarginLeft = MarginLeftInput.Text,
+            GapHorizontal = GapHorizontalInput.Text, GapVertical = GapVerticalInput.Text
+        };
+        try
+        {
+            using var connection = new SqliteConnection($"Data Source={GetDatabasePath()}");
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                INSERT INTO LabelTemplates(Name,DataJson,CreatedUtc,UpdatedUtc)
+                VALUES($name,$data,$now,$now)
+                ON CONFLICT(Name) DO UPDATE SET DataJson=excluded.DataJson, UpdatedUtc=excluded.UpdatedUtc;
+                """;
+            command.Parameters.AddWithValue("$name", name);
+            command.Parameters.AddWithValue("$data", JsonSerializer.Serialize(data));
+            command.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("O"));
+            command.ExecuteNonQuery();
+            RefreshSavedTemplates();
+            TemplateStatus.Text = $"Saved layout preset '{name}'.";
+        }
+        catch (Exception ex) { TemplateStatus.Text = $"Could not save preset: {ex.Message}"; }
+    }
+
+    private void RefreshSavedTemplates()
+    {
+        if (SavedTemplatesList is null) return;
+        try
+        {
+            var rows = new List<TemplateRow>();
+            using var connection = new SqliteConnection($"Data Source={GetDatabasePath()}");
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "SELECT Id,Name,DataJson FROM LabelTemplates ORDER BY Name;";
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+                rows.Add(new TemplateRow(reader.GetInt64(0), reader.GetString(1), reader.GetString(2)));
+            SavedTemplatesList.ItemsSource = rows;
+        }
+        catch (Exception ex) { TemplateStatus.Text = $"Could not load saved presets: {ex.Message}"; }
+    }
+
+    private void LoadTemplate_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireVerifiedEmail()) return;
+        if (SavedTemplatesList.SelectedItem is not TemplateRow selected) return;
+        try
+        {
+            var data = JsonSerializer.Deserialize<LayoutTemplateData>(selected.DataJson)
+                ?? throw new InvalidDataException("Preset data is empty.");
+            LabelWidthInput.Text = data.LabelWidth; LabelHeightInput.Text = data.LabelHeight;
+            if (data.PaperIndex >= 0 && data.PaperIndex < LabelPaperSize.Items.Count)
+                LabelPaperSize.SelectedIndex = data.PaperIndex;
+            CustomPaperWidth.Text = data.CustomPaperWidth; CustomPaperHeight.Text = data.CustomPaperHeight;
+            MarginTopInput.Text = data.MarginTop; MarginRightInput.Text = data.MarginRight;
+            MarginBottomInput.Text = data.MarginBottom; MarginLeftInput.Text = data.MarginLeft;
+            GapHorizontalInput.Text = data.GapHorizontal; GapVerticalInput.Text = data.GapVertical;
+            TemplateNameInput.Text = selected.Name;
+            TemplateStatus.Text = $"Loaded '{selected.Name}'. Apply dimensions to calculate labels per page.";
+            ShowPage("Designer");
+        }
+        catch (Exception ex) { TemplateStatus.Text = $"Could not load preset: {ex.Message}"; }
+    }
+
+    private void DeleteTemplate_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireVerifiedEmail()) return;
+        if (SavedTemplatesList.SelectedItem is not TemplateRow selected) return;
+        if (MessageBox.Show(this, $"Delete layout preset '{selected.Name}'?",
+            "Confirm deletion", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+        try
+        {
+            using var connection = new SqliteConnection($"Data Source={GetDatabasePath()}");
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "DELETE FROM LabelTemplates WHERE Id=$id;";
+            command.Parameters.AddWithValue("$id", selected.Id);
+            command.ExecuteNonQuery();
+            RefreshSavedTemplates();
+            TemplateStatus.Text = $"Deleted '{selected.Name}'.";
+        }
+        catch (Exception ex) { TemplateStatus.Text = $"Could not delete preset: {ex.Message}"; }
+    }
+
     private void DeleteProduct_Click(object sender, RoutedEventArgs e)
     {
         if (!RequireVerifiedEmail()) return;
@@ -1111,6 +1210,19 @@ public partial class MainWindow : Window
             );
             """;
         command.ExecuteNonQuery();
+        using (var templatesCommand = connection.CreateCommand())
+        {
+            templatesCommand.CommandText = """
+                CREATE TABLE IF NOT EXISTS LabelTemplates (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+                    DataJson TEXT NOT NULL,
+                    CreatedUtc TEXT NOT NULL,
+                    UpdatedUtc TEXT NOT NULL
+                );
+                """;
+            templatesCommand.ExecuteNonQuery();
+        }
 
         // Upgrade databases created by earlier versions without losing saved products.
         using var columnsCommand = connection.CreateCommand();
@@ -1466,6 +1578,23 @@ public partial class MainWindow : Window
         public bool BarcodeEnabled { get; set; }
         public bool QrEnabled { get; set; }
         public bool AutomaticUpdatesEnabled { get; set; } = true;
+    }
+
+    private sealed record TemplateRow(long Id, string Name, string DataJson);
+
+    private sealed class LayoutTemplateData
+    {
+        public string LabelWidth { get; set; } = "70";
+        public string LabelHeight { get; set; } = "45";
+        public int PaperIndex { get; set; }
+        public string CustomPaperWidth { get; set; } = "210";
+        public string CustomPaperHeight { get; set; } = "297";
+        public string MarginTop { get; set; } = "5";
+        public string MarginRight { get; set; } = "5";
+        public string MarginBottom { get; set; } = "5";
+        public string MarginLeft { get; set; } = "5";
+        public string GapHorizontal { get; set; } = "3";
+        public string GapVertical { get; set; } = "3";
     }
 
     private sealed record ProductRow
