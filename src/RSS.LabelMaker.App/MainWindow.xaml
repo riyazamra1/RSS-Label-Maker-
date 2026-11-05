@@ -182,7 +182,7 @@
        <TextBlock Text="SAVED LABEL LAYOUT PRESETS" FontSize="16" FontWeight="Bold"/>
        <TextBlock Text="Save and reuse physical label dimensions, paper profile, margins and gaps. Full editable canvas-element templates are still being developed." Foreground="#77808C" TextWrapping="Wrap" Margin="0,8,0,16"/>
        <TextBlock Text="Preset name" FontSize="11"/><TextBox x:Name="TemplateNameInput" Margin="0,4,0,12" MaxWidth="420" HorizontalAlignment="Left"/>
-       <WrapPanel><Button Content="Save Current Layout" Click="SaveTemplate_Click" Background="#C69A43" Padding="14,8" Margin="0,0,8,0"/><Button Content="Load Selected" Click="LoadTemplate_Click" Padding="14,8" Margin="0,0,8,0"/><Button Content="Delete Selected" Click="DeleteTemplate_Click" Padding="14,8"/></WrapPanel>
+       <WrapPanel><Button Content="Save Current Layout" Click="SaveTemplate_Click" Background="#C69A43" Padding="14,8" Margin="0,0,8,8"/><Button Content="Load Selected" Click="LoadTemplate_Click" Padding="14,8" Margin="0,0,8,8"/><Button Content="Duplicate" Click="DuplicateTemplate_Click" Padding="14,8" Margin="0,0,8,8"/><Button Content="Export" Click="ExportTemplate_Click" Padding="14,8" Margin="0,0,8,8"/><Button Content="Import" Click="ImportTemplate_Click" Padding="14,8" Margin="0,0,8,8"/><Button Content="Delete Selected" Click="DeleteTemplate_Click" Padding="14,8" Margin="0,0,8,8"/></WrapPanel>
        <ListBox x:Name="SavedTemplatesList" DisplayMemberPath="Name" Height="240" Margin="0,16,0,0"/>
        <TextBlock x:Name="TemplateStatus" Foreground="#4E7B5C" TextWrapping="Wrap" Margin="0,10,0,0"/>
       </StackPanel>
