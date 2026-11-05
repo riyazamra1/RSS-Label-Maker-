@@ -317,7 +317,7 @@ public partial class MainWindow : Window
         _automaticUpdates = SettingCheckBox("Automatically check, download and install updates at startup");
         _updateStatus = new TextBlock
         {
-            Text = "Update status: not checked yet.",
+            Text = $"Current version: {UpdateService.GetCurrentVersion()} · Update status: not checked yet.",
             TextWrapping = TextWrapping.Wrap,
             FontSize = 11,
             Foreground = Brush("#77808C"),
@@ -622,19 +622,23 @@ public partial class MainWindow : Window
     private async Task CheckForUpdatesAsync(bool userRequested)
     {
         if (!userRequested && !_settings.AutomaticUpdatesEnabled) return;
-        if (_updateStatus is not null) _updateStatus.Text = "Checking the RSS Label Maker release channel…";
+        if (_updateStatus is not null) _updateStatus.Text = $"Current version: {UpdateService.GetCurrentVersion()} · Checking for updates…";
 
         try
         {
-            var result = await UpdateService.CheckAndStageAsync();
+            var progress = new Progress<string>(message =>
+            {
+                if (_updateStatus is not null) _updateStatus.Text = $"Current version: {UpdateService.GetCurrentVersion()} · {message}";
+            });
+            var result = await UpdateService.CheckAndStageAsync(progress);
             if (result is null)
             {
-                if (_updateStatus is not null) _updateStatus.Text = "You are using the latest published version, or no release is available yet.";
+                if (_updateStatus is not null) _updateStatus.Text = $"Current version: {UpdateService.GetCurrentVersion()} · You are using the latest published version, or no stable release is available yet.";
                 return;
             }
 
             if (_updateStatus is not null)
-                _updateStatus.Text = $"Version {result.Version} is ready. Verifying package and preparing restart…";
+                _updateStatus.Text = $"Current version: {UpdateService.GetCurrentVersion()} · Version {result.Version} is verified and ready. Windows may request permission to install it.";
             SaveSessionSnapshot();
             UpdateService.StartUpdater(result, Environment.ProcessPath ?? throw new InvalidOperationException("Cannot locate the running application."), Environment.ProcessId);
             _sessionTimer.Stop();
