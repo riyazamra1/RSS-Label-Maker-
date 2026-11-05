@@ -1061,6 +1061,7 @@ public partial class MainWindow : Window
 
     private void LoadProducts()
     {
+        _products.Clear();
         using var connection = new SqliteConnection($"Data Source={GetDatabasePath()}");
         connection.Open();
         using var command = connection.CreateCommand();
