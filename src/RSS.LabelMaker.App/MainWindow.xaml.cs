@@ -1088,28 +1088,60 @@ public partial class MainWindow : Window
     private void ApplyLayout_Click(object sender, RoutedEventArgs e)
     {
         if (!RequireVerifiedEmail()) return;
-        if (!double.TryParse(LabelWidthInput.Text, NumberStyles.Number, CultureInfo.InvariantCulture, out var width) ||
-            !double.TryParse(LabelHeightInput.Text, NumberStyles.Number, CultureInfo.InvariantCulture, out var height) ||
-            width <= 0 || height <= 0)
+        static bool ReadPositive(string value, out double number) =>
+            double.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out number) &&
+            double.IsFinite(number) && number > 0;
+        static bool ReadNonNegative(string value, out double number) =>
+            double.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out number) &&
+            double.IsFinite(number) && number >= 0;
+
+        if (!ReadPositive(LabelWidthInput.Text, out var labelWidth) ||
+            !ReadPositive(LabelHeightInput.Text, out var labelHeight))
         {
             LayoutStatus.Text = "Enter positive label width and height in millimetres.";
             return;
         }
         var (paperWidth, paperHeight) = LabelPaperSize.SelectedIndex switch
         {
-            1 => (148d, 210d), 2 => (215.9d, 279.4d), _ => (210d, 297d)
+            1 => (148d, 210d),
+            2 => (215.9d, 279.4d),
+            3 when ReadPositive(CustomPaperWidth.Text, out var cw) &&
+                   ReadPositive(CustomPaperHeight.Text, out var ch) => (cw, ch),
+            3 => (0d, 0d),
+            _ => (210d, 297d)
         };
-        const double margin = 5d, gap = 3d;
-        var columns = (int)Math.Floor((paperWidth - 2 * margin + gap) / (width + gap));
-        var rows = (int)Math.Floor((paperHeight - 2 * margin + gap) / (height + gap));
-        if (columns < 1 || rows < 1)
+        if (paperWidth <= 0 || paperHeight <= 0)
         {
-            LayoutStatus.Text = $"A {width:0.##} × {height:0.##} mm label does not fit this sheet with 5 mm margins and 3 mm gaps.";
+            LayoutStatus.Text = "Enter valid positive custom paper width and height.";
             return;
         }
-        LayoutStatus.Text = $"{LabelPaperSize.Text} · {columns} columns × {rows} rows · {columns * rows} labels/sheet. Geometry only; printer hardware margins are not yet checked.";
+        if (!ReadNonNegative(MarginTopInput.Text, out var top) ||
+            !ReadNonNegative(MarginRightInput.Text, out var right) ||
+            !ReadNonNegative(MarginBottomInput.Text, out var bottom) ||
+            !ReadNonNegative(MarginLeftInput.Text, out var left) ||
+            !ReadNonNegative(GapHorizontalInput.Text, out var gapX) ||
+            !ReadNonNegative(GapVerticalInput.Text, out var gapY))
+        {
+            LayoutStatus.Text = "Margins and gaps must be zero or positive numbers.";
+            return;
+        }
+        if (left + right >= paperWidth || top + bottom >= paperHeight)
+        {
+            LayoutStatus.Text = "Margins leave no usable paper area.";
+            return;
+        }
+        var usableWidth = paperWidth - left - right;
+        var usableHeight = paperHeight - top - bottom;
+        var columns = (int)Math.Floor((usableWidth + gapX) / (labelWidth + gapX));
+        var rows = (int)Math.Floor((usableHeight + gapY) / (labelHeight + gapY));
+        if (columns < 1 || rows < 1)
+        {
+            LayoutStatus.Text = $"A {labelWidth:0.##} × {labelHeight:0.##} mm label does not fit the usable paper area.";
+            return;
+        }
+        var count = checked(columns * rows);
+        LayoutStatus.Text = $"{paperWidth:0.##} × {paperHeight:0.##} mm · {columns} columns × {rows} rows · {count} labels/sheet. Margins T{top}/R{right}/B{bottom}/L{left} mm; gaps H{gapX}/V{gapY} mm. Printer hardware margins still require validation.";
     }
-
 
     private void ExportProductsCsv_Click(object sender, RoutedEventArgs e)
     {
