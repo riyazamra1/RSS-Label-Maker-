@@ -364,6 +364,31 @@ public partial class MainWindow : Window
                 Margin = new Thickness(0, 4, 0, 10)
             }, fontLimits));
 
+        var backupButton = new Button
+        {
+            Content = "Back up local database",
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Padding = new Thickness(14, 7, 14, 7),
+            Margin = new Thickness(0, 0, 0, 8)
+        };
+        backupButton.Click += BackupDatabase_Click;
+        var restoreButton = new Button
+        {
+            Content = "Restore database backup",
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Padding = new Thickness(14, 7, 14, 7)
+        };
+        restoreButton.Click += RestoreDatabase_Click;
+        content.Children.Add(CreateSettingsSection("LOCAL DATA BACKUP & RESTORE",
+            new TextBlock
+            {
+                Text = "Back up products and local records to a SQLite database file. Restore validates the backup and creates a safety copy of the current database first.",
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 11,
+                Foreground = Brush("#77808C"),
+                Margin = new Thickness(0, 0, 0, 10)
+            }, backupButton, restoreButton));
+
         content.Children.Add(CreateSettingsSection("LABEL DESIGN DEFAULTS",
             new TextBlock
             {
@@ -1312,6 +1337,83 @@ public partial class MainWindow : Window
         if (quoted) throw new FormatException("Unclosed quoted CSV field.");
         values.Add(value.ToString());
         return values;
+    }
+
+    private void BackupDatabase_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireVerifiedEmail()) return;
+        var dialog = new SaveFileDialog
+        {
+            Filter = "RSS Label Maker database (*.db)|*.db",
+            FileName = $"rss-label-maker-backup-{DateTime.Now:yyyyMMdd-HHmmss}.db"
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            var sourcePath = GetDatabasePath();
+            using var source = new SqliteConnection($"Data Source={sourcePath};Mode=ReadWrite");
+            using var destination = new SqliteConnection($"Data Source={dialog.FileName}");
+            source.Open();
+            destination.Open();
+            source.BackupDatabase(destination);
+            PrintStatus.Text = $"Database backup created: {dialog.FileName}";
+            MessageBox.Show(this, "Database backup completed.", "RSS Label Maker",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"Backup failed: {ex.Message}", "RSS Label Maker",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void RestoreDatabase_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireVerifiedEmail()) return;
+        var dialog = new OpenFileDialog
+        {
+            Filter = "RSS Label Maker database (*.db)|*.db",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        if (MessageBox.Show(this,
+            "Restoring replaces the current local product database. A safety backup of the current database will be created first. Continue?",
+            "Confirm database restore", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            return;
+
+        var currentPath = GetDatabasePath();
+        var stagedPath = currentPath + ".restore-staging";
+        var safetyPath = currentPath + $".pre-restore-{DateTime.Now:yyyyMMdd-HHmmss}.bak";
+        try
+        {
+            using (var incoming = new SqliteConnection($"Data Source={dialog.FileName};Mode=ReadOnly"))
+            {
+                incoming.Open();
+                using var check = incoming.CreateCommand();
+                check.CommandText = "PRAGMA integrity_check;";
+                var integrity = Convert.ToString(check.ExecuteScalar(), CultureInfo.InvariantCulture);
+                if (!string.Equals(integrity, "ok", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException($"Backup integrity check failed: {integrity}");
+                using var staged = new SqliteConnection($"Data Source={stagedPath}");
+                staged.Open();
+                incoming.BackupDatabase(staged);
+            }
+
+            if (File.Exists(currentPath)) File.Copy(currentPath, safetyPath, true);
+            File.Copy(stagedPath, currentPath, true);
+            File.Delete(stagedPath);
+            LoadProducts();
+            MessageBox.Show(this,
+                $"Database restored. Previous database safety copy: {safetyPath}",
+                "RSS Label Maker", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            try { if (File.Exists(stagedPath)) File.Delete(stagedPath); } catch { }
+            MessageBox.Show(this, $"Restore failed. The original database was retained where possible. Details: {ex.Message}",
+                "RSS Label Maker", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private void RefreshPrinters_Click(object sender, RoutedEventArgs e) => RefreshPrinters();
