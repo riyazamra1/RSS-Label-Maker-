@@ -1078,6 +1078,95 @@ public partial class MainWindow : Window
         catch (Exception ex) { TemplateStatus.Text = $"Could not load saved presets: {ex.Message}"; }
     }
 
+    private void DuplicateTemplate_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireVerifiedEmail()) return;
+        if (SavedTemplatesList.SelectedItem is not TemplateRow selected) return;
+        try
+        {
+            var baseName = selected.Name + " Copy";
+            var name = baseName;
+            var suffix = 2;
+            using var connection = new SqliteConnection($"Data Source={GetDatabasePath()}");
+            connection.Open();
+            while (true)
+            {
+                using var exists = connection.CreateCommand();
+                exists.CommandText = "SELECT 1 FROM LabelTemplates WHERE Name=$name COLLATE NOCASE;";
+                exists.Parameters.AddWithValue("$name", name);
+                if (exists.ExecuteScalar() is null) break;
+                name = $"{baseName} {suffix++}";
+            }
+            using var insert = connection.CreateCommand();
+            insert.CommandText = "INSERT INTO LabelTemplates(Name,DataJson,CreatedUtc,UpdatedUtc) VALUES($name,$data,$now,$now);";
+            insert.Parameters.AddWithValue("$name", name);
+            insert.Parameters.AddWithValue("$data", selected.DataJson);
+            insert.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("O"));
+            insert.ExecuteNonQuery();
+            RefreshSavedTemplates();
+            TemplateStatus.Text = $"Duplicated as '{name}'.";
+        }
+        catch (Exception ex) { TemplateStatus.Text = $"Could not duplicate preset: {ex.Message}"; }
+    }
+
+    private void ExportTemplate_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireVerifiedEmail()) return;
+        if (SavedTemplatesList.SelectedItem is not TemplateRow selected) return;
+        var dialog = new SaveFileDialog
+        {
+            Filter = "RSS label layout (*.rslayout.json)|*.rslayout.json",
+            FileName = string.Concat(selected.Name.Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch)) + ".rslayout.json"
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            var export = new ExportedTemplate { Name = selected.Name, DataJson = selected.DataJson };
+            File.WriteAllText(dialog.FileName, JsonSerializer.Serialize(export, new JsonSerializerOptions { WriteIndented = true }));
+            TemplateStatus.Text = $"Exported '{selected.Name}'.";
+        }
+        catch (Exception ex) { TemplateStatus.Text = $"Export failed: {ex.Message}"; }
+    }
+
+    private void ImportTemplate_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireVerifiedEmail()) return;
+        var dialog = new OpenFileDialog
+        {
+            Filter = "RSS label layout (*.rslayout.json)|*.rslayout.json|JSON files (*.json)|*.json",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            var imported = JsonSerializer.Deserialize<ExportedTemplate>(File.ReadAllText(dialog.FileName))
+                ?? throw new InvalidDataException("The selected file is not a valid RSS layout preset.");
+            if (string.IsNullOrWhiteSpace(imported.Name) || string.IsNullOrWhiteSpace(imported.DataJson))
+                throw new InvalidDataException("The layout preset is missing its name or data.");
+            var data = JsonSerializer.Deserialize<LayoutTemplateData>(imported.DataJson)
+                ?? throw new InvalidDataException("The layout preset data is invalid.");
+            if (!double.TryParse(data.LabelWidth, NumberStyles.Number, CultureInfo.InvariantCulture, out var w) || w <= 0 ||
+                !double.TryParse(data.LabelHeight, NumberStyles.Number, CultureInfo.InvariantCulture, out var h) || h <= 0)
+                throw new InvalidDataException("The layout dimensions are invalid.");
+            using var connection = new SqliteConnection($"Data Source={GetDatabasePath()}");
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                INSERT INTO LabelTemplates(Name,DataJson,CreatedUtc,UpdatedUtc)
+                VALUES($name,$data,$now,$now)
+                ON CONFLICT(Name) DO UPDATE SET DataJson=excluded.DataJson, UpdatedUtc=excluded.UpdatedUtc;
+                """;
+            command.Parameters.AddWithValue("$name", imported.Name.Trim());
+            command.Parameters.AddWithValue("$data", JsonSerializer.Serialize(data));
+            command.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("O"));
+            command.ExecuteNonQuery();
+            RefreshSavedTemplates();
+            TemplateStatus.Text = $"Imported '{imported.Name}'.";
+        }
+        catch (Exception ex) { TemplateStatus.Text = $"Import failed: {ex.Message}"; }
+    }
+
     private void LoadTemplate_Click(object sender, RoutedEventArgs e)
     {
         if (!RequireVerifiedEmail()) return;
@@ -1581,6 +1670,12 @@ public partial class MainWindow : Window
     }
 
     private sealed record TemplateRow(long Id, string Name, string DataJson);
+    private sealed class ExportedTemplate
+    {
+        public string Name { get; set; } = "";
+        public string DataJson { get; set; } = "";
+    }
+
 
     private sealed class LayoutTemplateData
     {
