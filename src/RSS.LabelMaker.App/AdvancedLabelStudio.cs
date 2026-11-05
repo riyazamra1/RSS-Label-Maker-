@@ -10,9 +10,43 @@ using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Printing;
 
 namespace RSS.LabelMaker.App;
+
+internal interface ITransliterationProvider
+{
+    string Id { get; }
+    Task<string> TransliterateAsync(string source, string targetLanguage, CancellationToken cancellationToken = default);
+}
+
+internal sealed class GoogleInputToolsProvider : ITransliterationProvider
+{
+    private static readonly HttpClient Client = new() { Timeout = TimeSpan.FromSeconds(20) };
+    public string Id => "google-input-tools-v1";
+
+    public async Task<string> TransliterateAsync(string source, string targetLanguage, CancellationToken cancellationToken = default)
+    {
+        var code = targetLanguage == "si" ? "si-t-i0-und" : targetLanguage == "ta" ? "ta-t-i0-und" : throw new ArgumentOutOfRangeException(nameof(targetLanguage));
+        var url = "https://inputtools.google.com/request?text=" + Uri.EscapeDataString(source) +
+                  "&itc=" + code + "&num=5&cp=0&cs=1&ie=utf-8&oe=utf-8";
+        using var response = await Client.GetAsync(url, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+        var root = json.RootElement;
+        if (root.ValueKind != JsonValueKind.Array || root.GetArrayLength() < 2 ||
+            root[0].GetString() != "SUCCESS" || root[1].GetArrayLength() == 0)
+            throw new InvalidOperationException("The transliteration provider did not return a successful result.");
+        var alternatives = root[1][0][1];
+        if (alternatives.ValueKind != JsonValueKind.Array || alternatives.GetArrayLength() == 0)
+            throw new InvalidOperationException("No transliteration suggestion was returned.");
+        var result = alternatives[0].GetString()?.Trim();
+        return string.IsNullOrWhiteSpace(result)
+            ? throw new InvalidOperationException("The transliteration provider returned an empty result.")
+            : result;
+    }
+}
 
 internal sealed class LabelDesignDocument
 {
@@ -34,11 +68,12 @@ internal sealed class LabelDesignElement
     public string Color { get; set; } = "#20242B";
     public bool Bold { get; set; }
     public string Alignment { get; set; } = "Left";
+    public string ImageBase64 { get; set; } = "";
 }
 
 public partial class MainWindow
 {
-    private static readonly HttpClient TransliterationHttp = new() { Timeout = TimeSpan.FromSeconds(20) };
+    private static readonly ITransliterationProvider TransliterationProvider = new GoogleInputToolsProvider();
 
     private void MainWindow_AdvancedLoaded(object sender, RoutedEventArgs e)
     {
@@ -149,7 +184,8 @@ public partial class MainWindow
         }
         using (var cached = connection.CreateCommand())
         {
-            cached.CommandText = "SELECT ResultText FROM TransliterationCache WHERE AccountId=$a AND SourceText=$s AND TargetLanguage=$t AND Provider='google-input-tools-v1';";
+            cached.CommandText = "SELECT ResultText FROM TransliterationCache WHERE AccountId=$a AND SourceText=$s AND TargetLanguage=$t AND Provider=$p;";
+            cached.Parameters.AddWithValue("$p", TransliterationProvider.Id);
             cached.Parameters.AddWithValue("$a", accountKey);
             cached.Parameters.AddWithValue("$s", source);
             cached.Parameters.AddWithValue("$t", target);
@@ -167,31 +203,17 @@ public partial class MainWindow
         }
         if (uses >= 5 && !premium)
             throw new InvalidOperationException("Your five free automatic transliteration uses have been used. An active Premium subscription is required for further automatic transliteration.");
-        var code = target == "si" ? "si-t-i0-und" : "ta-t-i0-und";
-        var url = "https://inputtools.google.com/request?text=" + Uri.EscapeDataString(source) +
-                  "&itc=" + code + "&num=5&cp=0&cs=1&ie=utf-8&oe=utf-8";
-        using var response = await TransliterationHttp.GetAsync(url);
-        response.EnsureSuccessStatusCode();
-        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        var root = json.RootElement;
-        if (root.ValueKind != JsonValueKind.Array || root.GetArrayLength() < 2 ||
-            root[0].GetString() != "SUCCESS" || root[1].GetArrayLength() == 0)
-            throw new InvalidOperationException("The transliteration provider did not return a successful result.");
-        var alternatives = root[1][0][1];
-        if (alternatives.ValueKind != JsonValueKind.Array || alternatives.GetArrayLength() == 0)
-            throw new InvalidOperationException("No transliteration suggestion was returned.");
-        var result = alternatives[0].GetString()?.Trim();
-        if (string.IsNullOrWhiteSpace(result))
-            throw new InvalidOperationException("The transliteration provider returned an empty result.");
+        var result = await TransliterationProvider.TransliterateAsync(source, target);
         using var transaction = connection.BeginTransaction();
         using (var insert = connection.CreateCommand())
         {
             insert.Transaction = transaction;
-            insert.CommandText = "INSERT OR REPLACE INTO TransliterationCache(AccountId,SourceText,TargetLanguage,ResultText,Provider,CreatedUtc) VALUES($a,$s,$t,$r,'google-input-tools-v1',$d);";
+            insert.CommandText = "INSERT OR REPLACE INTO TransliterationCache(AccountId,SourceText,TargetLanguage,ResultText,Provider,CreatedUtc) VALUES($a,$s,$t,$r,$p,$d);";
             insert.Parameters.AddWithValue("$a", accountKey);
             insert.Parameters.AddWithValue("$s", source);
             insert.Parameters.AddWithValue("$t", target);
             insert.Parameters.AddWithValue("$r", result);
+            insert.Parameters.AddWithValue("$p", TransliterationProvider.Id);
             insert.Parameters.AddWithValue("$d", DateTimeOffset.UtcNow.ToString("O"));
             insert.ExecuteNonQuery();
         }
@@ -271,6 +293,8 @@ internal sealed class LabelStudioWindow : Window
     private readonly TextBox _height = new();
     private readonly TextBox _fontSize = new();
     private readonly ComboBox _color = new();
+    private readonly ComboBox _fontFamily = new();
+    private readonly ComboBox _alignment = new();
     private readonly CheckBox _bold = new();
     private LabelDesignElement? _selected;
     private Point _dragOrigin;
@@ -319,12 +343,13 @@ internal sealed class LabelStudioWindow : Window
     private static LabelDesignDocument CreateDefault(double width, double height)
     {
         var d = new LabelDesignDocument { WidthMm = width, HeightMm = height };
-        d.Elements.Add(new() { Text = "{{English}}", X = 2, Y = 2, Width = width - 4, Height = 8, FontSize = 16, Color = "#C83232", Bold = true, Alignment = "Center" });
-        d.Elements.Add(new() { Text = "{{Sinhala}}  •  {{Tamil}}", X = 2, Y = 11, Width = width - 4, Height = 7, FontSize = 9, Color = "#C83232", Alignment = "Center" });
-        d.Elements.Add(new() { Text = "M.F.D: {{Mfd}}     EXP.D: {{Expiry}}", X = 3, Y = 20, Width = width - 6, Height = 6, FontSize = 7 });
-        d.Elements.Add(new() { Text = "B.No: {{Batch}}     N.Wt: {{NetWeight}}", X = 3, Y = 27, Width = width - 6, Height = 6, FontSize = 7 });
-        d.Elements.Add(new() { Text = "M.R.P. Rs. {{Mrp}}", X = 2, Y = 34, Width = width - 4, Height = 7, FontSize = 12, Bold = true, Alignment = "Center" });
-        d.Elements.Add(new() { Text = "SUGAR {{Sugar}} {{SugarUnit}}   SALT {{Salt}} {{SaltUnit}}   FAT {{Fat}} {{FatUnit}}", X = 2, Y = 41, Width = width - 4, Height = 7, FontSize = 6 });
+        d.Elements.Add(new() { Text = "{{English}}", X = 2, Y = 1, Width = width - 4, Height = 7, FontSize = 16, Color = "#C83232", Bold = true, Alignment = "Center" });
+        d.Elements.Add(new() { Text = "{{Sinhala}}  •  {{Tamil}}", X = 2, Y = 8, Width = width - 4, Height = 5, FontSize = 9, Color = "#C83232", Alignment = "Center" });
+        d.Elements.Add(new() { Text = "M.F.D: {{Mfd}}     EXP.D: {{Expiry}}", X = 3, Y = 14, Width = width - 6, Height = 5, FontSize = 7 });
+        d.Elements.Add(new() { Text = "B.No: {{Batch}}     N.Wt: {{NetWeight}}", X = 3, Y = 20, Width = width - 6, Height = 5, FontSize = 7 });
+        d.Elements.Add(new() { Text = "M.R.P. Rs. {{Mrp}}", X = 2, Y = 26, Width = width - 4, Height = 6, FontSize = 12, Bold = true, Alignment = "Center" });
+        d.Elements.Add(new() { Text = "SUGAR {{Sugar}} {{SugarUnit}}   SALT {{Salt}} {{SaltUnit}}   FAT {{Fat}} {{FatUnit}}", X = 2, Y = 33, Width = width - 4, Height = 6, FontSize = 6 });
+        d.Elements.Add(new() { Text = "Import By: {{Importer}}", X = 2, Y = 40, Width = width - 4, Height = 4, FontSize = 6 });
         return d;
     }
 
@@ -338,6 +363,7 @@ internal sealed class LabelStudioWindow : Window
         AddButton(tools, "Add text", () => AddElement("New text", "text"));
         AddButton(tools, "Add product field", () => AddElement("{{English}}", "text"));
         AddButton(tools, "Add rectangle", () => AddElement("", "shape"));
+        AddButton(tools, "Add image", AddImage);
         AddButton(tools, "Duplicate selected", DuplicateSelected);
         AddButton(tools, "Delete selected", DeleteSelected);
         tools.Children.Add(new Separator { Margin = new Thickness(0, 12, 0, 8) });
@@ -348,6 +374,12 @@ internal sealed class LabelStudioWindow : Window
         AddField(tools, "Width (mm)", _width);
         AddField(tools, "Height (mm)", _height);
         AddField(tools, "Font size (pt)", _fontSize);
+        _fontFamily.ItemsSource = new[] { "Arial", "Calibri", "Segoe UI", "Nirmala UI", "Iskoola Pota", "Latha" };
+        tools.Children.Add(new TextBlock { Text = "Font family", FontSize = 10, Margin = new Thickness(0, 5, 0, 2) });
+        tools.Children.Add(_fontFamily);
+        _alignment.ItemsSource = new[] { "Left", "Center", "Right" };
+        tools.Children.Add(new TextBlock { Text = "Text alignment", FontSize = 10, Margin = new Thickness(0, 5, 0, 2) });
+        tools.Children.Add(_alignment);
         _color.ItemsSource = new[] { "#20242B", "#C83232", "#458A58", "#D99B37", "#FFFFFF", "#000000" };
         tools.Children.Add(new TextBlock { Text = "Text colour", FontSize = 10, Margin = new Thickness(0, 5, 0, 2) });
         tools.Children.Add(_color);
@@ -357,6 +389,8 @@ internal sealed class LabelStudioWindow : Window
         _color.SelectionChanged += (_, _) => { if (_selected is not null && _color.SelectedItem is string c) { _selected.Color = c; RenderCanvas(false); } };
         _bold.Checked += (_, _) => { if (_selected is not null) { _selected.Bold = true; RenderCanvas(false); } };
         _bold.Unchecked += (_, _) => { if (_selected is not null) { _selected.Bold = false; RenderCanvas(false); } };
+        _fontFamily.SelectionChanged += (_, _) => { if (_selected is not null && _fontFamily.SelectedItem is string family) { _selected.FontFamily = family; RenderCanvas(false); } };
+        _alignment.SelectionChanged += (_, _) => { if (_selected is not null && _alignment.SelectedItem is string alignment) { _selected.Alignment = alignment; RenderCanvas(false); } };
         var apply = new Button { Content = "Apply position / size", Margin = new Thickness(0, 8, 0, 8), Padding = new Thickness(8) };
         apply.Click += (_, _) => ApplyGeometry();
         tools.Children.Add(apply);
@@ -395,6 +429,25 @@ internal sealed class LabelStudioWindow : Window
         panel.Children.Add(button);
     }
 
+    private void AddImage()
+    {
+        var dialog = new OpenFileDialog { Filter = "Images (*.png;*.jpg;*.jpeg;*.bmp)|*.png;*.jpg;*.jpeg;*.bmp", CheckFileExists = true };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            var element = new LabelDesignElement
+            {
+                Kind = "image", Text = "Image",
+                ImageBase64 = Convert.ToBase64String(File.ReadAllBytes(dialog.FileName)),
+                X = 3, Y = 3, Width = Math.Min(30, _document.WidthMm - 6), Height = 18
+            };
+            _document.Elements.Add(element);
+            RenderCanvas();
+            Select(element);
+        }
+        catch (Exception ex) { MessageBox.Show(this, ex.Message, "Could not add image", MessageBoxButton.OK, MessageBoxImage.Warning); }
+    }
+
     private void AddElement(string text, string kind)
     {
         var element = new LabelDesignElement
@@ -431,6 +484,8 @@ internal sealed class LabelStudioWindow : Window
         _fontSize.Text = element?.FontSize.ToString("0.##", CultureInfo.InvariantCulture) ?? "";
         _color.SelectedItem = element?.Color;
         _bold.IsChecked = element?.Bold == true;
+        _fontFamily.SelectedItem = element?.FontFamily;
+        _alignment.SelectedItem = element?.Alignment;
         _layers.SelectedItem = element;
     }
     private void SelectedTextChanged(object? sender, TextChangedEventArgs e)
@@ -462,10 +517,12 @@ internal sealed class LabelStudioWindow : Window
             FrameworkElement visual;
             if (element.Kind == "shape")
                 visual = new Border { BorderBrush = BrushFrom(element.Color), BorderThickness = new Thickness(1), Background = Brushes.Transparent };
+            else if (element.Kind == "image")
+                visual = new Image { Source = LoadImage(element.ImageBase64), Stretch = Stretch.Uniform };
             else
                 visual = new TextBlock
                 {
-                    Text = element.Text, FontSize = element.FontSize, FontFamily = new FontFamily(element.FontFamily),
+                    Text = element.Text, FontSize = element.FontSize * 96d / 72d, FontFamily = new FontFamily(element.FontFamily),
                     Foreground = BrushFrom(element.Color), FontWeight = element.Bold ? FontWeights.Bold : FontWeights.Normal,
                     TextWrapping = TextWrapping.Wrap, TextAlignment = element.Alignment == "Center" ? TextAlignment.Center : element.Alignment == "Right" ? TextAlignment.Right : TextAlignment.Left,
                     VerticalAlignment = VerticalAlignment.Center
@@ -509,6 +566,19 @@ internal sealed class LabelStudioWindow : Window
         var overflow = _document.Elements.Count(e => e.X < 0 || e.Y < 0 || e.X + e.Width > _document.WidthMm || e.Y + e.Height > _document.HeightMm);
         Title = overflow == 0 ? "RSS Label Maker — Full Canvas Designer" : $"RSS Label Maker — Designer ({overflow} overflow warning(s))";
     }
+    private static BitmapImage LoadImage(string base64)
+    {
+        var bytes = Convert.FromBase64String(base64);
+        using var stream = new MemoryStream(bytes);
+        var bitmap = new BitmapImage();
+        bitmap.BeginInit();
+        bitmap.CacheOption = BitmapCacheOption.OnLoad;
+        bitmap.StreamSource = stream;
+        bitmap.EndInit();
+        bitmap.Freeze();
+        return bitmap;
+    }
+
     private static Brush BrushFrom(string color)
     {
         try { return (Brush)new BrushConverter().ConvertFromString(color)!; }
@@ -583,12 +653,20 @@ internal sealed class LabelPrintPreviewWindow : Window
                         label.Children.Add(shape);
                         continue;
                     }
+                    if (element.Kind == "image")
+                    {
+                        var image = new Image { Source = LoadImage(element.ImageBase64), Width = element.Width * DipPerMm, Height = element.Height * DipPerMm, Stretch = Stretch.Uniform };
+                        Canvas.SetLeft(image, element.X * DipPerMm);
+                        Canvas.SetTop(image, element.Y * DipPerMm);
+                        label.Children.Add(image);
+                        continue;
+                    }
                     var text = element.Text;
                     foreach (var pair in values) text = text.Replace("{{" + pair.Key + "}}", pair.Value ?? "", StringComparison.OrdinalIgnoreCase);
                     var block = new TextBlock
                     {
                         Text = text, Width = element.Width * DipPerMm, Height = element.Height * DipPerMm,
-                        FontSize = element.FontSize, FontFamily = new FontFamily(element.FontFamily),
+                        FontSize = element.FontSize * 96d / 72d, FontFamily = new FontFamily(element.FontFamily),
                         FontWeight = element.Bold ? FontWeights.Bold : FontWeights.Normal,
                         Foreground = BrushFrom(element.Color), TextWrapping = TextWrapping.Wrap,
                         TextAlignment = element.Alignment == "Center" ? TextAlignment.Center : element.Alignment == "Right" ? TextAlignment.Right : TextAlignment.Left,
@@ -615,6 +693,23 @@ internal sealed class LabelPrintPreviewWindow : Window
             if (dialog.ShowDialog() != true) return;
             try { dialog.PrintTicket.PageMediaSize = new PageMediaSize(paperW, paperH); }
             catch { MessageBox.Show(this, "The selected printer driver may not support this custom page size. Check printer properties before printing.", "Paper size warning", MessageBoxButton.OK, MessageBoxImage.Warning); }
+            try
+            {
+                var imageable = dialog.PrintQueue?.GetPrintCapabilities(dialog.PrintTicket).PageImageableArea;
+                if (imageable is not null)
+                {
+                    var hardwareLeft = imageable.OriginWidth / DipPerMm;
+                    var hardwareTop = imageable.OriginHeight / DipPerMm;
+                    var hardwareRight = (paperW - imageable.OriginWidth - imageable.ExtentWidth) / DipPerMm;
+                    var hardwareBottom = (paperH - imageable.OriginHeight - imageable.ExtentHeight) / DipPerMm;
+                    if (left + 0.01 < hardwareLeft || top + 0.01 < hardwareTop || right + 0.01 < hardwareRight || bottom + 0.01 < hardwareBottom)
+                    {
+                        var warning = $"Configured margins (L{left:0.##}, T{top:0.##}, R{right:0.##}, B{bottom:0.##} mm) are smaller than this printer's reported non-printable margins (L{hardwareLeft:0.##}, T{hardwareTop:0.##}, R{hardwareRight:0.##}, B{hardwareBottom:0.##} mm). Output may be clipped. Continue?";
+                        if (MessageBox.Show(this, warning, "Printer margin warning", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+                    }
+                }
+            }
+            catch { MessageBox.Show(this, "The printer driver did not provide printable-area information. Verify hardware margins and print a calibration page before production.", "Printer capability warning", MessageBoxButton.OK, MessageBoxImage.Warning); }
             dialog.PrintDocument(_fixedDocument.DocumentPaginator, "RSS Label Maker labels");
         };
         var root = new DockPanel();
