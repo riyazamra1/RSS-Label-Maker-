@@ -38,6 +38,7 @@ public partial class MainWindow : Window
     private TextBlock? _updateStatus;
     private Button? _accountButton;
     private RssAccountSession? _accountSession;
+    private long? _editingProductId;
     private Border? _verificationBanner;
 
     public MainWindow()
@@ -912,7 +913,13 @@ public partial class MainWindow : Window
             using var connection = new SqliteConnection($"Data Source={GetDatabasePath()}");
             connection.Open();
             using var command = connection.CreateCommand();
-            command.CommandText = """
+            command.CommandText = _editingProductId.HasValue ? """
+                UPDATE Products SET Category=$category, English=$english, Sinhala=$sinhala, Tamil=$tamil,
+                    Mfd=$mfd, Expiry=$expiry, Batch=$batch, NetWeight=$weight, Sugar=$sugar, Salt=$salt,
+                    Fat=$fat, Mrp=$mrp, Importer=$importer, Copies=$copies, PrintMfd=$printMfd,
+                    PrintExpiry=$printExpiry, PrintBatch=$printBatch, PrintNetWeight=$printWeight
+                WHERE Id=$id;
+                """ : """
                 INSERT INTO Products
                 (Category, English, Sinhala, Tamil, Mfd, Expiry, Batch, NetWeight, Sugar, Salt, Fat, Mrp, Importer, Copies,
                  PrintMfd, PrintExpiry, PrintBatch, PrintNetWeight, CreatedUtc)
@@ -938,15 +945,47 @@ public partial class MainWindow : Window
             command.Parameters.AddWithValue("$printExpiry", product.PrintExpiry ? 1 : 0);
             command.Parameters.AddWithValue("$printBatch", product.PrintBatch ? 1 : 0);
             command.Parameters.AddWithValue("$printWeight", product.PrintNetWeight ? 1 : 0);
-            command.Parameters.AddWithValue("$createdUtc", DateTimeOffset.UtcNow.ToString("O"));
+            if (_editingProductId.HasValue) command.Parameters.AddWithValue("$id", _editingProductId.Value);
+            else command.Parameters.AddWithValue("$createdUtc", DateTimeOffset.UtcNow.ToString("O"));
             command.ExecuteNonQuery();
-            _products.Add(product);
+            if (_editingProductId.HasValue)
+            {
+                var index = _products.ToList().FindIndex(x => x.Id == _editingProductId.Value);
+                if (index >= 0) _products[index] = product with { Id = _editingProductId.Value };
+                ProductStatus.Text = "Product changes updated successfully.";
+            }
+            else
+            {
+                var insertedId = connection.LastInsertRowId;
+                _products.Insert(0, product with { Id = insertedId });
+                ProductStatus.Text = "Product saved to the local SQLite database.";
+            }
+            _editingProductId = null;
             ProductCount.Text = _products.Count.ToString();
-            ProductStatus.Text = "Product saved to the local SQLite database.";
+            SaveProductButton.Content = "Save Product";
             UpdateLabelPreview(product);
             SaveSessionSnapshot();
         }
         catch (Exception ex) { ProductStatus.Text = $"Product was not saved: {ex.Message}"; }
+    }
+
+    private void EditProduct_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireVerifiedEmail()) return;
+        if (sender is not Button { DataContext: ProductRow product } || product.Id <= 0) return;
+        _editingProductId = product.Id;
+        ProductCategory.SelectedIndex = Math.Max(0, ProductCategory.Items.Cast<ComboBoxItem>().ToList()
+            .FindIndex(x => string.Equals(x.Content?.ToString(), product.Category, StringComparison.Ordinal)));
+        EnglishName.Text = product.English; SinhalaName.Text = product.Sinhala; TamilName.Text = product.Tamil;
+        Mfd.Text = product.Mfd; Expiry.Text = product.Expiry; Batch.Text = product.Batch; NetWeight.Text = product.NetWeight;
+        Sugar.Text = product.Sugar; Salt.Text = product.Salt; Fat.Text = product.Fat; Mrp.Text = product.Mrp;
+        Importer.Text = product.Importer; Copies.Text = product.Copies.ToString();
+        PrintMfd.IsChecked = product.PrintMfd; PrintExpiry.IsChecked = product.PrintExpiry;
+        PrintBatch.IsChecked = product.PrintBatch; PrintNetWeight.IsChecked = product.PrintNetWeight;
+        SaveProductButton.Content = "Update Product";
+        ProductStatus.Text = $"Editing: {product.English}";
+        UpdateLabelPreview(product);
+        EnglishName.Focus();
     }
 
     private void UpdateLabelPreview(ProductRow product)
@@ -1016,20 +1055,20 @@ public partial class MainWindow : Window
         connection.Open();
         using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT Category, English, Sinhala, Tamil, Mfd, Expiry, Batch, NetWeight, Sugar, Salt, Fat, Mrp, Importer, Copies,
+            SELECT Id, Category, English, Sinhala, Tamil, Mfd, Expiry, Batch, NetWeight, Sugar, Salt, Fat, Mrp, Importer, Copies,
                    PrintMfd, PrintExpiry, PrintBatch, PrintNetWeight FROM Products ORDER BY Id DESC;
             """;
         using var reader = command.ExecuteReader();
         while (reader.Read())
             _products.Add(new ProductRow
             {
-                Category = reader.GetString(0), English = reader.GetString(1), Sinhala = reader.GetString(2), Tamil = reader.GetString(3),
-                Mfd = reader.GetString(4), Expiry = reader.GetString(5), Batch = reader.GetString(6),
-                NetWeight = reader.GetString(7), Sugar = reader.GetString(8), Salt = reader.GetString(9),
-                Fat = reader.GetString(10), Mrp = reader.GetString(11), Importer = reader.GetString(12),
-                Copies = reader.GetInt32(13), PrintMfd = reader.GetInt32(14) == 1,
-                PrintExpiry = reader.GetInt32(15) == 1, PrintBatch = reader.GetInt32(16) == 1,
-                PrintNetWeight = reader.GetInt32(17) == 1
+                Id = reader.GetInt64(0), Category = reader.GetString(1), English = reader.GetString(2), Sinhala = reader.GetString(3), Tamil = reader.GetString(4),
+                Mfd = reader.GetString(5), Expiry = reader.GetString(6), Batch = reader.GetString(7),
+                NetWeight = reader.GetString(8), Sugar = reader.GetString(9), Salt = reader.GetString(10),
+                Fat = reader.GetString(11), Mrp = reader.GetString(12), Importer = reader.GetString(13),
+                Copies = reader.GetInt32(14), PrintMfd = reader.GetInt32(15) == 1,
+                PrintExpiry = reader.GetInt32(16) == 1, PrintBatch = reader.GetInt32(17) == 1,
+                PrintNetWeight = reader.GetInt32(18) == 1
             });
         ProductCount.Text = _products.Count.ToString();
         if (_products.Count > 0) UpdateLabelPreview(_products[0]);
@@ -1112,8 +1151,9 @@ public partial class MainWindow : Window
         public bool AutomaticUpdatesEnabled { get; set; } = true;
     }
 
-    private sealed class ProductRow
+    private sealed record ProductRow
     {
+        public long Id { get; init; }
         public string Category { get; init; } = "Other";
         public string English { get; init; } = "";
         public string Sinhala { get; init; } = "";
