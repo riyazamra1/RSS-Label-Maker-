@@ -8,6 +8,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Microsoft.Win32;
+using System.Text;
 
 namespace RSS.LabelMaker.App;
 
@@ -1105,6 +1107,133 @@ public partial class MainWindow : Window
             return;
         }
         LayoutStatus.Text = $"{LabelPaperSize.Text} · {columns} columns × {rows} rows · {columns * rows} labels/sheet. Geometry only; printer hardware margins are not yet checked.";
+    }
+
+
+    private void ExportProductsCsv_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireVerifiedEmail()) return;
+        var dialog = new SaveFileDialog { Filter = "CSV files (*.csv)|*.csv", FileName = "rss-label-maker-products.csv" };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            var rows = new List<string>
+            {
+                "Category,English,Sinhala,Tamil,Mfd,Expiry,Batch,NetWeight,Sugar,Salt,Fat,Mrp,Importer,Copies,PrintMfd,PrintExpiry,PrintBatch,PrintNetWeight"
+            };
+            rows.AddRange(_products.Select(p => string.Join(",", new[]
+            {
+                p.Category,p.English,p.Sinhala,p.Tamil,p.Mfd,p.Expiry,p.Batch,p.NetWeight,p.Sugar,p.Salt,p.Fat,p.Mrp,p.Importer,
+                p.Copies.ToString(CultureInfo.InvariantCulture),p.PrintMfd ? "true" : "false",p.PrintExpiry ? "true" : "false",
+                p.PrintBatch ? "true" : "false",p.PrintNetWeight ? "true" : "false"
+            }.Select(CsvEscape))));
+            File.WriteAllText(dialog.FileName, string.Join(Environment.NewLine, rows), new UTF8Encoding(true));
+            ImportStatus.Text = $"Exported {_products.Count} product(s) to {dialog.FileName}.";
+        }
+        catch (Exception ex) { ImportStatus.Text = $"CSV export failed: {ex.Message}"; }
+    }
+
+    private void ImportProductsCsv_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireVerifiedEmail()) return;
+        var dialog = new OpenFileDialog { Filter = "CSV files (*.csv)|*.csv", Multiselect = false };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            var lines = File.ReadAllLines(dialog.FileName, Encoding.UTF8);
+            if (lines.Length < 2) { ImportStatus.Text = "The CSV file contains no product rows."; return; }
+            var headers = ParseCsvLine(lines[0]).Select((h, i) => (Name: h.Trim(), Index: i))
+                .ToDictionary(x => x.Name, x => x.Index, StringComparer.OrdinalIgnoreCase);
+            if (!headers.ContainsKey("English")) { ImportStatus.Text = "CSV must contain an English column. No data was imported."; return; }
+            var imported = 0; var rejected = new List<string>();
+            using var connection = new SqliteConnection($"Data Source={GetDatabasePath()}");
+            connection.Open();
+            using var transaction = connection.BeginTransaction();
+            for (var lineIndex = 1; lineIndex < lines.Length; lineIndex++)
+            {
+                if (string.IsNullOrWhiteSpace(lines[lineIndex])) continue;
+                try
+                {
+                    var values = ParseCsvLine(lines[lineIndex]);
+                    string Read(string name, string fallback = "") =>
+                        headers.TryGetValue(name, out var index) && index < values.Count ? values[index].Trim() : fallback;
+                    var english = Read("English");
+                    if (string.IsNullOrWhiteSpace(english)) throw new FormatException("English product name is required.");
+                    var copiesText = Read("Copies", "1");
+                    if (!int.TryParse(copiesText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var copies) || copies < 1)
+                        throw new FormatException("Copies must be a positive whole number.");
+                    var product = new ProductRow
+                    {
+                        Category = Read("Category", "Other"), English = english, Sinhala = Read("Sinhala"), Tamil = Read("Tamil"),
+                        Mfd = Read("Mfd"), Expiry = Read("Expiry"), Batch = Read("Batch"), NetWeight = Read("NetWeight"),
+                        Sugar = Read("Sugar"), Salt = Read("Salt"), Fat = Read("Fat"), Mrp = Read("Mrp"), Importer = Read("Importer"),
+                        Copies = copies, PrintMfd = Read("PrintMfd").Equals("true", StringComparison.OrdinalIgnoreCase) || Read("PrintMfd") == "1",
+                        PrintExpiry = Read("PrintExpiry").Equals("true", StringComparison.OrdinalIgnoreCase) || Read("PrintExpiry") == "1",
+                        PrintBatch = Read("PrintBatch").Equals("true", StringComparison.OrdinalIgnoreCase) || Read("PrintBatch") == "1",
+                        PrintNetWeight = Read("PrintNetWeight").Equals("true", StringComparison.OrdinalIgnoreCase) || Read("PrintNetWeight") == "1"
+                    };
+                    using var command = connection.CreateCommand();
+                    command.Transaction = transaction;
+                    command.CommandText = """
+                        INSERT INTO Products
+                        (Category,English,Sinhala,Tamil,Mfd,Expiry,Batch,NetWeight,Sugar,Salt,Fat,Mrp,Importer,Copies,
+                         PrintMfd,PrintExpiry,PrintBatch,PrintNetWeight,CreatedUtc)
+                        VALUES ($category,$english,$sinhala,$tamil,$mfd,$expiry,$batch,$weight,$sugar,$salt,$fat,$mrp,$importer,$copies,
+                         $printMfd,$printExpiry,$printBatch,$printWeight,$createdUtc);
+                        """;
+                    command.Parameters.AddWithValue("$category", product.Category);
+                    command.Parameters.AddWithValue("$english", product.English);
+                    command.Parameters.AddWithValue("$sinhala", product.Sinhala);
+                    command.Parameters.AddWithValue("$tamil", product.Tamil);
+                    command.Parameters.AddWithValue("$mfd", product.Mfd);
+                    command.Parameters.AddWithValue("$expiry", product.Expiry);
+                    command.Parameters.AddWithValue("$batch", product.Batch);
+                    command.Parameters.AddWithValue("$weight", product.NetWeight);
+                    command.Parameters.AddWithValue("$sugar", product.Sugar);
+                    command.Parameters.AddWithValue("$salt", product.Salt);
+                    command.Parameters.AddWithValue("$fat", product.Fat);
+                    command.Parameters.AddWithValue("$mrp", product.Mrp);
+                    command.Parameters.AddWithValue("$importer", product.Importer);
+                    command.Parameters.AddWithValue("$copies", product.Copies);
+                    command.Parameters.AddWithValue("$printMfd", product.PrintMfd ? 1 : 0);
+                    command.Parameters.AddWithValue("$printExpiry", product.PrintExpiry ? 1 : 0);
+                    command.Parameters.AddWithValue("$printBatch", product.PrintBatch ? 1 : 0);
+                    command.Parameters.AddWithValue("$printWeight", product.PrintNetWeight ? 1 : 0);
+                    command.Parameters.AddWithValue("$createdUtc", DateTimeOffset.UtcNow.ToString("O"));
+                    command.ExecuteNonQuery();
+                    imported++;
+                }
+                catch (Exception ex) { rejected.Add($"Row {lineIndex + 1}: {ex.Message}"); }
+            }
+            transaction.Commit();
+            LoadProducts();
+            ImportStatus.Text = $"Imported {imported} product(s). Rejected {rejected.Count} row(s)." +
+                (rejected.Count == 0 ? "" : Environment.NewLine + string.Join(Environment.NewLine, rejected.Take(20)));
+        }
+        catch (Exception ex) { ImportStatus.Text = $"CSV import failed: {ex.Message}"; }
+    }
+
+    private static string CsvEscape(string value) => "\"" + value.Replace("\"", "\"\"") + "\"";
+
+    private static List<string> ParseCsvLine(string line)
+    {
+        var values = new List<string>();
+        var value = new StringBuilder();
+        var quoted = false;
+        for (var i = 0; i < line.Length; i++)
+        {
+            var ch = line[i];
+            if (ch == '"')
+            {
+                if (quoted && i + 1 < line.Length && line[i + 1] == '"') { value.Append('"'); i++; }
+                else quoted = !quoted;
+            }
+            else if (ch == ',' && !quoted) { values.Add(value.ToString()); value.Clear(); }
+            else value.Append(ch);
+        }
+        if (quoted) throw new FormatException("Unclosed quoted CSV field.");
+        values.Add(value.ToString());
+        return values;
     }
 
     private void RefreshPrinters_Click(object sender, RoutedEventArgs e) => RefreshPrinters();
