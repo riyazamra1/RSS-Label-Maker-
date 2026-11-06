@@ -7,6 +7,7 @@ on:
       - "src/**"
       - "*.sln"
       - ".github/workflows/rlm-windows-build.yml"
+      - ".github/workflows/rlm-release.yml"
   workflow_dispatch:
 
 permissions:
@@ -32,6 +33,15 @@ jobs:
         run: dotnet build RSS.LabelMaker.sln --configuration Release --no-restore
       - name: Publish Windows x64 test package
         run: dotnet publish src/RSS.LabelMaker.App/RSS.LabelMaker.App.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts/RSS-Label-Maker-win-x64
+      - name: Validate updater package contents
+        shell: pwsh
+        run: |
+          $publish = "artifacts/RSS-Label-Maker-win-x64"
+          foreach ($file in @("RSS.LabelMaker.exe", "RSS.LabelMaker.dll")) {
+            if (!(Test-Path (Join-Path $publish $file))) { throw "Required updater package file missing: $file" }
+          }
+          $runtimeConfig = Join-Path $publish "RSS.LabelMaker.runtimeconfig.json"
+          if (!(Test-Path $runtimeConfig)) { throw "Runtime configuration missing from self-contained package." }
       - name: Upload Windows x64 test package
         uses: actions/upload-artifact@v4
         with:
