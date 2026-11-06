@@ -28,7 +28,7 @@ internal static class RssCoreAccountClient
         {
             display_name = name, email, password, project_key = ProjectKey
         });
-        using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+        using var document = await ReadResponseAsync(response, "RSS Core");
         if (!response.IsSuccessStatusCode)
             throw new InvalidOperationException(ReadError(document.RootElement, "Registration failed."));
         var required = (document.RootElement.TryGetProperty("email_verification_required", out var value) || document.RootElement.TryGetProperty("verification_required", out value)) && value.ValueKind == JsonValueKind.True;
@@ -43,7 +43,7 @@ internal static class RssCoreAccountClient
         {
             email, project_key = ProjectKey
         });
-        using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+        using var document = await ReadResponseAsync(response, "RSS Core");
         if (!response.IsSuccessStatusCode)
             throw new InvalidOperationException(ReadError(document.RootElement, "Unable to resend verification email."));
         return "If this account still needs verification, a new verification email has been sent.";
@@ -52,7 +52,7 @@ internal static class RssCoreAccountClient
     public static async Task<string> RequestPasswordResetAsync(string email)
     {
         using var response = await Http.PostAsJsonAsync(ApiBase + "forgot-password", new { email, project_key = ProjectKey });
-        using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+        using var document = await ReadResponseAsync(response, "RSS Core");
         if (!response.IsSuccessStatusCode)
             throw new InvalidOperationException(ReadError(document.RootElement, "Unable to request a password reset."));
         return document.RootElement.TryGetProperty("message", out var message)
@@ -63,7 +63,7 @@ internal static class RssCoreAccountClient
     public static async Task<string> VerifyPasswordResetCodeAsync(string email, string code)
     {
         using var response = await Http.PostAsJsonAsync(ApiBase + "verify-password-reset", new { email, code, project_key = ProjectKey });
-        using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+        using var document = await ReadResponseAsync(response, "RSS Core");
         if (!response.IsSuccessStatusCode)
             throw new InvalidOperationException(ReadError(document.RootElement, "Reset code verification failed."));
         if (!document.RootElement.TryGetProperty("reset_token", out var token) || string.IsNullOrWhiteSpace(token.GetString()))
@@ -77,7 +77,7 @@ internal static class RssCoreAccountClient
         {
             email, reset_token = resetToken, new_password = newPassword, project_key = ProjectKey
         });
-        using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+        using var document = await ReadResponseAsync(response, "RSS Core");
         if (!response.IsSuccessStatusCode)
             throw new InvalidOperationException(ReadError(document.RootElement, "Password reset failed."));
         return document.RootElement.TryGetProperty("message", out var message)
@@ -91,7 +91,7 @@ internal static class RssCoreAccountClient
         {
             email, password, project_key = ProjectKey
         });
-        using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+        using var document = await ReadResponseAsync(response, "RSS Core");
         if (!response.IsSuccessStatusCode)
             throw new InvalidOperationException(ReadError(document.RootElement, "Sign-in failed."));
         var root = document.RootElement;
@@ -114,7 +114,7 @@ internal static class RssCoreAccountClient
             return null;
         }
         if (!response.IsSuccessStatusCode) throw new HttpRequestException("RSS Core account service is temporarily unavailable.");
-        using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+        using var document = await ReadResponseAsync(response, "RSS Core");
         return ReadSession(document.RootElement);
     }
 
@@ -148,8 +148,41 @@ internal static class RssCoreAccountClient
             license.TryGetProperty("expires_at", out var expiry) && expiry.ValueKind != JsonValueKind.Null ? expiry.GetString() : null);
     }
 
-    private static string ReadError(JsonElement root, string fallback) =>
-        root.TryGetProperty("error", out var error) ? error.GetString() ?? fallback : fallback;
+    private static async Task<JsonDocument> ReadResponseAsync(HttpResponseMessage response, string operation)
+    {
+        var body = await response.Content.ReadAsStringAsync();
+        if (string.IsNullOrWhiteSpace(body))
+            throw new InvalidOperationException($"{operation} returned an empty response (HTTP {(int)response.StatusCode}).");
+
+        try
+        {
+            var document = JsonDocument.Parse(body);
+            if (!response.IsSuccessStatusCode)
+            {
+                var message = ReadError(document.RootElement, $"{operation} request failed.");
+                document.Dispose();
+                throw new InvalidOperationException($"{message} (HTTP {(int)response.StatusCode}).");
+            }
+            return document;
+        }
+        catch (JsonException)
+        {
+            var excerpt = body.Trim();
+            if (excerpt.Length > 500) excerpt = excerpt[..500] + "…";
+            throw new InvalidOperationException(
+                $"{operation} returned a non-JSON response (HTTP {(int)response.StatusCode}). " +
+                $"The account service or its gateway returned: {excerpt}");
+        }
+    }
+
+    private static string ReadError(JsonElement root, string fallback)
+    {
+        if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("error", out var error))
+            return error.ValueKind == JsonValueKind.String ? error.GetString() ?? fallback : error.ToString();
+        if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("message", out var message))
+            return message.ValueKind == JsonValueKind.String ? message.GetString() ?? fallback : message.ToString();
+        return fallback;
+    }
 
     private static void SaveToken(string token)
     {
