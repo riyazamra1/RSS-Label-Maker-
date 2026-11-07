@@ -8,6 +8,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Microsoft.Win32;
+using System.Text;
 
 namespace RSS.LabelMaker.App;
 
@@ -37,6 +39,9 @@ public partial class MainWindow : Window
     private CheckBox? _automaticUpdates;
     private TextBlock? _updateStatus;
     private Button? _accountButton;
+    private RssAccountSession? _accountSession;
+    private long? _editingProductId;
+    private Border? _verificationBanner;
 
     public MainWindow()
     {
@@ -51,9 +56,38 @@ public partial class MainWindow : Window
         WireDesignerOptionPersistence();
         UpdateClock();
         InitializeSessionRecovery();
+        AddVerificationBanner();
         Loaded += async (_, _) =>
         {
+            try
+            {
+                _accountSession = await RssCoreAccountClient.GetSessionAsync();
+                if (_accountSession is null)
+                {
+                    var account = new AccountWindow { Owner = this };
+                    if (account.ShowDialog() != true)
+                    {
+                        Close();
+                        return;
+                    }
+                    _accountSession = await RssCoreAccountClient.GetSessionAsync();
+                    if (_accountSession is null)
+                    {
+                        Close();
+                        return;
+                    }
+                }
+                ApplyAccountAccess();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, "RSS account service could not be reached. Sign-in is required to use RSS Label Maker.\n\n" + ex.Message,
+                    "RSS Account Required", MessageBoxButton.OK, MessageBoxImage.Warning);
+                Close();
+                return;
+            }
             await RefreshAccountButtonAsync();
+            UpdateService.MarkStartupHealthy();
             await ShowPendingUpdateWelcomeAsync();
             await CheckForUpdatesAsync(false);
         };
@@ -98,6 +132,7 @@ public partial class MainWindow : Window
                         var account = new AccountWindow { Owner = this };
                         account.ShowDialog();
                         await RefreshAccountButtonAsync();
+                        if (_accountSession is null) Close();
                     };
                     existingRightPanel.Children.Insert(0, _accountButton);
                 }
@@ -145,17 +180,84 @@ public partial class MainWindow : Window
         if (_accountButton is null) return;
         try
         {
-            var session = await RssCoreAccountClient.GetSessionAsync();
-            _accountButton.Content = session is null ? "Sign in" : "My account";
-            _accountButton.ToolTip = session is null
-                ? "Sign in to RSS Core for cloud backup, restore and license management."
-                : $"Signed in as {session.Email}";
+            _accountSession = await RssCoreAccountClient.GetSessionAsync();
+            ApplyAccountAccess();
+            _accountButton.Content = _accountSession is null ? "Sign in" : "My account";
+            _accountButton.ToolTip = _accountSession is null
+                ? "Sign in to RSS Core."
+                : $"Signed in as {_accountSession.Email}" + (_accountSession.EmailVerified ? " (verified)" : " (email not verified)");
         }
         catch
         {
-            _accountButton.Content = "Sign in";
+            _accountButton.Content = "Account unavailable";
             _accountButton.ToolTip = "RSS Core account services require an internet connection.";
         }
+    }
+
+    private void AddVerificationBanner()
+    {
+        if (DashboardPage.Content is not StackPanel dashboard) return;
+        _verificationBanner = new Border
+        {
+            Background = Brush("#FFF4D6"),
+            BorderBrush = Brush("#E6C56C"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(7),
+            Padding = new Thickness(14),
+            Margin = new Thickness(0, 0, 0, 16),
+            Visibility = Visibility.Collapsed,
+            Child = new TextBlock
+            {
+                Text = "EMAIL VERIFICATION REQUIRED — You can use the dashboard, but product creation, label editing and printing remain locked until you verify your email. Use My Account to resend the verification email.",
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = Brush("#76520C"),
+                FontSize = 12
+            }
+        };
+        dashboard.Children.Insert(0, _verificationBanner);
+    }
+
+    private bool HasActiveLicense()
+    {
+        if (_accountSession is null || !string.Equals(_accountSession.LicenseStatus, "active", StringComparison.OrdinalIgnoreCase))
+            return false;
+        if (string.IsNullOrWhiteSpace(_accountSession.ExpiresAt)) return true;
+        return DateTimeOffset.TryParse(_accountSession.ExpiresAt, CultureInfo.InvariantCulture,
+            DateTimeStyles.AssumeUniversal, out var expiry) && expiry > DateTimeOffset.UtcNow;
+    }
+
+    private bool CanUseLabelFeatures() => _accountSession?.EmailVerified == true && HasActiveLicense();
+
+    private void ApplyAccountAccess()
+    {
+        var allowed = CanUseLabelFeatures();
+        if (_verificationBanner is not null)
+        {
+            _verificationBanner.Visibility = allowed ? Visibility.Collapsed : Visibility.Visible;
+            if (_verificationBanner.Child is TextBlock message)
+            {
+                message.Text = _accountSession?.EmailVerified != true
+                    ? "EMAIL VERIFICATION REQUIRED — You can use the dashboard, but product creation, label editing and printing remain locked until you verify your email. Use My Account to resend the verification email."
+                    : "LICENCE EXPIRED OR INACTIVE — Your dashboard remains available, but label creation, editing and printing require an active RSS Label Maker licence.";
+            }
+        }
+        if (!allowed && new[] { "Products", "Designer", "Templates", "Print", "Import" }.Contains(_lastActivePage, StringComparer.Ordinal))
+        {
+            _lastActivePage = "Dashboard";
+            ShowPage("Dashboard");
+        }
+    }
+
+    private bool RequireVerifiedEmail()
+    {
+        if (CanUseLabelFeatures()) return true;
+        var message = _accountSession?.EmailVerified != true
+            ? "Please verify your RSS account email address first. You can still use the dashboard and resend the verification email from My Account."
+            : "Your RSS Label Maker trial or licence is expired or inactive. An active licence is required to create, edit or print labels.";
+        MessageBox.Show(this, message, "RSS Label Maker Access Required",
+            MessageBoxButton.OK, MessageBoxImage.Information);
+        ShowPage("Dashboard");
+        return false;
     }
 
     private void BuildSettingsPage()
@@ -215,7 +317,7 @@ public partial class MainWindow : Window
         _automaticUpdates = SettingCheckBox("Automatically check, download and install updates at startup");
         _updateStatus = new TextBlock
         {
-            Text = "Update status: not checked yet.",
+            Text = $"Current version: {UpdateService.GetCurrentVersion()} · Update status: not checked yet.",
             TextWrapping = TextWrapping.Wrap,
             FontSize = 11,
             Foreground = Brush("#77808C"),
@@ -232,7 +334,7 @@ public partial class MainWindow : Window
             _automaticUpdates, _updateStatus, checkNow,
             new TextBlock
             {
-                Text = "Updates are downloaded only from the RSS Label Maker GitHub Releases page. A separate updater replaces the application and restarts it. Internet access is required; offline label work remains available.",
+                Text = "Updates use stable, versioned RSS Label Maker GitHub Releases. The updater verifies the SHA-256 package checksum, replaces the complete Windows application folder and checks successful startup before removing the previous version. Internet access is required; offline label work remains available.",
                 TextWrapping = TextWrapping.Wrap,
                 FontSize = 10,
                 Foreground = Brush("#77808C")
@@ -262,6 +364,31 @@ public partial class MainWindow : Window
                 Foreground = Brush("#77808C"),
                 Margin = new Thickness(0, 4, 0, 10)
             }, fontLimits));
+
+        var backupButton = new Button
+        {
+            Content = "Back up local database",
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Padding = new Thickness(14, 7, 14, 7),
+            Margin = new Thickness(0, 0, 0, 8)
+        };
+        backupButton.Click += BackupDatabase_Click;
+        var restoreButton = new Button
+        {
+            Content = "Restore database backup",
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Padding = new Thickness(14, 7, 14, 7)
+        };
+        restoreButton.Click += RestoreDatabase_Click;
+        content.Children.Add(CreateSettingsSection("LOCAL DATA BACKUP & RESTORE",
+            new TextBlock
+            {
+                Text = "Back up products and local records to a SQLite database file. Restore validates the backup and creates a safety copy of the current database first.",
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 11,
+                Foreground = Brush("#77808C"),
+                Margin = new Thickness(0, 0, 0, 10)
+            }, backupButton, restoreButton));
 
         content.Children.Add(CreateSettingsSection("LABEL DESIGN DEFAULTS",
             new TextBlock
@@ -495,19 +622,23 @@ public partial class MainWindow : Window
     private async Task CheckForUpdatesAsync(bool userRequested)
     {
         if (!userRequested && !_settings.AutomaticUpdatesEnabled) return;
-        if (_updateStatus is not null) _updateStatus.Text = "Checking the RSS Label Maker release channel…";
+        if (_updateStatus is not null) _updateStatus.Text = $"Current version: {UpdateService.GetCurrentVersion()} · Checking for updates…";
 
         try
         {
-            var result = await UpdateService.CheckAndStageAsync();
+            var progress = new Progress<string>(message =>
+            {
+                if (_updateStatus is not null) _updateStatus.Text = $"Current version: {UpdateService.GetCurrentVersion()} · {message}";
+            });
+            var result = await UpdateService.CheckAndStageAsync(progress);
             if (result is null)
             {
-                if (_updateStatus is not null) _updateStatus.Text = "You are using the latest published version, or no release is available yet.";
+                if (_updateStatus is not null) _updateStatus.Text = $"Current version: {UpdateService.GetCurrentVersion()} · You are using the latest published version, or no stable release is available yet.";
                 return;
             }
 
             if (_updateStatus is not null)
-                _updateStatus.Text = $"Version {result.Version} is ready. Verifying package and preparing restart…";
+                _updateStatus.Text = $"Current version: {UpdateService.GetCurrentVersion()} · Version {result.Version} is verified and ready. Windows may request permission to install it.";
             SaveSessionSnapshot();
             UpdateService.StartUpdater(result, Environment.ProcessPath ?? throw new InvalidOperationException("Cannot locate the running application."), Environment.ProcessId);
             _sessionTimer.Stop();
@@ -626,6 +757,10 @@ public partial class MainWindow : Window
                 LabelWidth = LabelWidthInput.Text,
                 LabelHeight = LabelHeightInput.Text,
                 PaperIndex = LabelPaperSize.SelectedIndex,
+                CustomPaperWidth = CustomPaperWidth.Text, CustomPaperHeight = CustomPaperHeight.Text,
+                MarginTop = MarginTopInput.Text, MarginRight = MarginRightInput.Text,
+                MarginBottom = MarginBottomInput.Text, MarginLeft = MarginLeftInput.Text,
+                GapHorizontal = GapHorizontalInput.Text, GapVertical = GapVerticalInput.Text,
                 SelectedProductIndex = ProductsGrid.SelectedIndex,
                 WindowWidth = Width,
                 WindowHeight = Height,
@@ -677,6 +812,11 @@ public partial class MainWindow : Window
             LabelHeightInput.Text = snapshot.LabelHeight;
             if (snapshot.PaperIndex >= 0 && snapshot.PaperIndex < LabelPaperSize.Items.Count)
                 LabelPaperSize.SelectedIndex = snapshot.PaperIndex;
+            CustomPaperWidth.Text = snapshot.CustomPaperWidth;
+            CustomPaperHeight.Text = snapshot.CustomPaperHeight;
+            MarginTopInput.Text = snapshot.MarginTop; MarginRightInput.Text = snapshot.MarginRight;
+            MarginBottomInput.Text = snapshot.MarginBottom; MarginLeftInput.Text = snapshot.MarginLeft;
+            GapHorizontalInput.Text = snapshot.GapHorizontal; GapVerticalInput.Text = snapshot.GapVertical;
             if (snapshot.SelectedProductIndex >= 0 && snapshot.SelectedProductIndex < ProductsGrid.Items.Count)
                 ProductsGrid.SelectedIndex = snapshot.SelectedProductIndex;
             if (snapshot.WindowWidth >= MinWidth && snapshot.WindowWidth <= 10000) Width = snapshot.WindowWidth;
@@ -726,10 +866,24 @@ public partial class MainWindow : Window
         public string LabelWidth { get; set; } = "70";
         public string LabelHeight { get; set; } = "45";
         public int PaperIndex { get; set; }
+        public string CustomPaperWidth { get; set; } = "210";
+        public string CustomPaperHeight { get; set; } = "297";
+        public string MarginTop { get; set; } = "5";
+        public string MarginRight { get; set; } = "5";
+        public string MarginBottom { get; set; } = "5";
+        public string MarginLeft { get; set; } = "5";
+        public string GapHorizontal { get; set; } = "3";
+        public string GapVertical { get; set; } = "3";
         public int SelectedProductIndex { get; set; } = -1;
         public double WindowWidth { get; set; }
         public double WindowHeight { get; set; }
         public bool IsMaximized { get; set; }
+    }
+
+    private void CloseApplication_Click(object sender, RoutedEventArgs e)
+    {
+        SaveSessionSnapshot();
+        Close();
     }
 
     private void Nav_Click(object sender, RoutedEventArgs e)
@@ -740,7 +894,17 @@ public partial class MainWindow : Window
 
     private void ShowPage(string page)
     {
+        if (page != "Dashboard" && _accountSession is null)
+        {
+            page = "Dashboard";
+        }
+        else if (page != "Dashboard" && !CanUseLabelFeatures())
+        {
+            RequireVerifiedEmail();
+            return;
+        }
         _lastActivePage = page;
+        if (page == "Templates") RefreshSavedTemplates();
         DashboardPage.Visibility = page == "Dashboard" ? Visibility.Visible : Visibility.Collapsed;
         ProductsPage.Visibility = page == "Products" ? Visibility.Visible : Visibility.Collapsed;
         DesignerPage.Visibility = page == "Designer" ? Visibility.Visible : Visibility.Collapsed;
@@ -784,6 +948,7 @@ public partial class MainWindow : Window
 
     private void SaveProduct_Click(object sender, RoutedEventArgs e)
     {
+        if (!RequireVerifiedEmail()) return;
         if (string.IsNullOrWhiteSpace(EnglishName.Text))
         {
             ProductStatus.Text = "Enter an English product name before saving.";
@@ -804,7 +969,13 @@ public partial class MainWindow : Window
             using var connection = new SqliteConnection($"Data Source={GetDatabasePath()}");
             connection.Open();
             using var command = connection.CreateCommand();
-            command.CommandText = """
+            command.CommandText = _editingProductId.HasValue ? """
+                UPDATE Products SET Category=$category, English=$english, Sinhala=$sinhala, Tamil=$tamil,
+                    Mfd=$mfd, Expiry=$expiry, Batch=$batch, NetWeight=$weight, Sugar=$sugar, Salt=$salt,
+                    Fat=$fat, Mrp=$mrp, Importer=$importer, Copies=$copies, PrintMfd=$printMfd,
+                    PrintExpiry=$printExpiry, PrintBatch=$printBatch, PrintNetWeight=$printWeight
+                WHERE Id=$id;
+                """ : """
                 INSERT INTO Products
                 (Category, English, Sinhala, Tamil, Mfd, Expiry, Batch, NetWeight, Sugar, Salt, Fat, Mrp, Importer, Copies,
                  PrintMfd, PrintExpiry, PrintBatch, PrintNetWeight, CreatedUtc)
@@ -830,15 +1001,264 @@ public partial class MainWindow : Window
             command.Parameters.AddWithValue("$printExpiry", product.PrintExpiry ? 1 : 0);
             command.Parameters.AddWithValue("$printBatch", product.PrintBatch ? 1 : 0);
             command.Parameters.AddWithValue("$printWeight", product.PrintNetWeight ? 1 : 0);
-            command.Parameters.AddWithValue("$createdUtc", DateTimeOffset.UtcNow.ToString("O"));
+            if (_editingProductId.HasValue) command.Parameters.AddWithValue("$id", _editingProductId.Value);
+            else command.Parameters.AddWithValue("$createdUtc", DateTimeOffset.UtcNow.ToString("O"));
             command.ExecuteNonQuery();
-            _products.Add(product);
+            if (_editingProductId.HasValue)
+            {
+                var index = _products.ToList().FindIndex(x => x.Id == _editingProductId.Value);
+                if (index >= 0) _products[index] = product with { Id = _editingProductId.Value };
+                ProductStatus.Text = "Product changes updated successfully.";
+            }
+            else
+            {
+                using var idCommand = connection.CreateCommand();
+                idCommand.CommandText = "SELECT last_insert_rowid();";
+                var insertedId = Convert.ToInt64(idCommand.ExecuteScalar(), CultureInfo.InvariantCulture);
+                _products.Insert(0, product with { Id = insertedId });
+                ProductStatus.Text = "Product saved to the local SQLite database.";
+            }
+            _editingProductId = null;
             ProductCount.Text = _products.Count.ToString();
-            ProductStatus.Text = "Product saved to the local SQLite database.";
+            SaveProductButton.Content = "Save Product";
             UpdateLabelPreview(product);
             SaveSessionSnapshot();
         }
         catch (Exception ex) { ProductStatus.Text = $"Product was not saved: {ex.Message}"; }
+    }
+
+    private void SaveTemplate_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireVerifiedEmail()) return;
+        var name = TemplateNameInput.Text.Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            TemplateStatus.Text = "Enter a name for this layout preset.";
+            return;
+        }
+        var data = new LayoutTemplateData
+        {
+            LabelWidth = LabelWidthInput.Text, LabelHeight = LabelHeightInput.Text,
+            PaperIndex = LabelPaperSize.SelectedIndex,
+            CustomPaperWidth = CustomPaperWidth.Text, CustomPaperHeight = CustomPaperHeight.Text,
+            MarginTop = MarginTopInput.Text, MarginRight = MarginRightInput.Text,
+            MarginBottom = MarginBottomInput.Text, MarginLeft = MarginLeftInput.Text,
+            GapHorizontal = GapHorizontalInput.Text, GapVertical = GapVerticalInput.Text
+        };
+        try
+        {
+            using var connection = new SqliteConnection($"Data Source={GetDatabasePath()}");
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                INSERT INTO LabelTemplates(Name,DataJson,CreatedUtc,UpdatedUtc)
+                VALUES($name,$data,$now,$now)
+                ON CONFLICT(Name) DO UPDATE SET DataJson=excluded.DataJson, UpdatedUtc=excluded.UpdatedUtc;
+                """;
+            command.Parameters.AddWithValue("$name", name);
+            command.Parameters.AddWithValue("$data", JsonSerializer.Serialize(data));
+            command.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("O"));
+            command.ExecuteNonQuery();
+            RefreshSavedTemplates();
+            TemplateStatus.Text = $"Saved layout preset '{name}'.";
+        }
+        catch (Exception ex) { TemplateStatus.Text = $"Could not save preset: {ex.Message}"; }
+    }
+
+    private void RefreshSavedTemplates()
+    {
+        if (SavedTemplatesList is null) return;
+        try
+        {
+            var rows = new List<TemplateRow>();
+            using var connection = new SqliteConnection($"Data Source={GetDatabasePath()}");
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "SELECT Id,Name,DataJson FROM LabelTemplates ORDER BY Name;";
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+                rows.Add(new TemplateRow(reader.GetInt64(0), reader.GetString(1), reader.GetString(2)));
+            SavedTemplatesList.ItemsSource = rows;
+        }
+        catch (Exception ex) { TemplateStatus.Text = $"Could not load saved presets: {ex.Message}"; }
+    }
+
+    private void DuplicateTemplate_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireVerifiedEmail()) return;
+        if (SavedTemplatesList.SelectedItem is not TemplateRow selected) return;
+        try
+        {
+            var baseName = selected.Name + " Copy";
+            var name = baseName;
+            var suffix = 2;
+            using var connection = new SqliteConnection($"Data Source={GetDatabasePath()}");
+            connection.Open();
+            while (true)
+            {
+                using var exists = connection.CreateCommand();
+                exists.CommandText = "SELECT 1 FROM LabelTemplates WHERE Name=$name COLLATE NOCASE;";
+                exists.Parameters.AddWithValue("$name", name);
+                if (exists.ExecuteScalar() is null) break;
+                name = $"{baseName} {suffix++}";
+            }
+            using var insert = connection.CreateCommand();
+            insert.CommandText = "INSERT INTO LabelTemplates(Name,DataJson,CreatedUtc,UpdatedUtc) VALUES($name,$data,$now,$now);";
+            insert.Parameters.AddWithValue("$name", name);
+            insert.Parameters.AddWithValue("$data", selected.DataJson);
+            insert.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("O"));
+            insert.ExecuteNonQuery();
+            RefreshSavedTemplates();
+            TemplateStatus.Text = $"Duplicated as '{name}'.";
+        }
+        catch (Exception ex) { TemplateStatus.Text = $"Could not duplicate preset: {ex.Message}"; }
+    }
+
+    private void ExportTemplate_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireVerifiedEmail()) return;
+        if (SavedTemplatesList.SelectedItem is not TemplateRow selected) return;
+        var dialog = new SaveFileDialog
+        {
+            Filter = "RSS label layout (*.rslayout.json)|*.rslayout.json",
+            FileName = string.Concat(selected.Name.Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch)) + ".rslayout.json"
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            var export = new ExportedTemplate { Name = selected.Name, DataJson = selected.DataJson };
+            File.WriteAllText(dialog.FileName, JsonSerializer.Serialize(export, new JsonSerializerOptions { WriteIndented = true }));
+            TemplateStatus.Text = $"Exported '{selected.Name}'.";
+        }
+        catch (Exception ex) { TemplateStatus.Text = $"Export failed: {ex.Message}"; }
+    }
+
+    private void ImportTemplate_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireVerifiedEmail()) return;
+        var dialog = new OpenFileDialog
+        {
+            Filter = "RSS label layout (*.rslayout.json)|*.rslayout.json|JSON files (*.json)|*.json",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            var imported = JsonSerializer.Deserialize<ExportedTemplate>(File.ReadAllText(dialog.FileName))
+                ?? throw new InvalidDataException("The selected file is not a valid RSS layout preset.");
+            if (string.IsNullOrWhiteSpace(imported.Name) || string.IsNullOrWhiteSpace(imported.DataJson))
+                throw new InvalidDataException("The layout preset is missing its name or data.");
+            var data = JsonSerializer.Deserialize<LayoutTemplateData>(imported.DataJson)
+                ?? throw new InvalidDataException("The layout preset data is invalid.");
+            if (!double.TryParse(data.LabelWidth, NumberStyles.Number, CultureInfo.InvariantCulture, out var w) || w <= 0 ||
+                !double.TryParse(data.LabelHeight, NumberStyles.Number, CultureInfo.InvariantCulture, out var h) || h <= 0)
+                throw new InvalidDataException("The layout dimensions are invalid.");
+            using var connection = new SqliteConnection($"Data Source={GetDatabasePath()}");
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                INSERT INTO LabelTemplates(Name,DataJson,CreatedUtc,UpdatedUtc)
+                VALUES($name,$data,$now,$now)
+                ON CONFLICT(Name) DO UPDATE SET DataJson=excluded.DataJson, UpdatedUtc=excluded.UpdatedUtc;
+                """;
+            command.Parameters.AddWithValue("$name", imported.Name.Trim());
+            command.Parameters.AddWithValue("$data", JsonSerializer.Serialize(data));
+            command.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("O"));
+            command.ExecuteNonQuery();
+            RefreshSavedTemplates();
+            TemplateStatus.Text = $"Imported '{imported.Name}'.";
+        }
+        catch (Exception ex) { TemplateStatus.Text = $"Import failed: {ex.Message}"; }
+    }
+
+    private void LoadTemplate_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireVerifiedEmail()) return;
+        if (SavedTemplatesList.SelectedItem is not TemplateRow selected) return;
+        try
+        {
+            var data = JsonSerializer.Deserialize<LayoutTemplateData>(selected.DataJson)
+                ?? throw new InvalidDataException("Preset data is empty.");
+            LabelWidthInput.Text = data.LabelWidth; LabelHeightInput.Text = data.LabelHeight;
+            if (data.PaperIndex >= 0 && data.PaperIndex < LabelPaperSize.Items.Count)
+                LabelPaperSize.SelectedIndex = data.PaperIndex;
+            CustomPaperWidth.Text = data.CustomPaperWidth; CustomPaperHeight.Text = data.CustomPaperHeight;
+            MarginTopInput.Text = data.MarginTop; MarginRightInput.Text = data.MarginRight;
+            MarginBottomInput.Text = data.MarginBottom; MarginLeftInput.Text = data.MarginLeft;
+            GapHorizontalInput.Text = data.GapHorizontal; GapVerticalInput.Text = data.GapVertical;
+            TemplateNameInput.Text = selected.Name;
+            TemplateStatus.Text = $"Loaded '{selected.Name}'. Apply dimensions to calculate labels per page.";
+            ShowPage("Designer");
+        }
+        catch (Exception ex) { TemplateStatus.Text = $"Could not load preset: {ex.Message}"; }
+    }
+
+    private void DeleteTemplate_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireVerifiedEmail()) return;
+        if (SavedTemplatesList.SelectedItem is not TemplateRow selected) return;
+        if (MessageBox.Show(this, $"Delete layout preset '{selected.Name}'?",
+            "Confirm deletion", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+        try
+        {
+            using var connection = new SqliteConnection($"Data Source={GetDatabasePath()}");
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "DELETE FROM LabelTemplates WHERE Id=$id;";
+            command.Parameters.AddWithValue("$id", selected.Id);
+            command.ExecuteNonQuery();
+            RefreshSavedTemplates();
+            TemplateStatus.Text = $"Deleted '{selected.Name}'.";
+        }
+        catch (Exception ex) { TemplateStatus.Text = $"Could not delete preset: {ex.Message}"; }
+    }
+
+    private void DeleteProduct_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireVerifiedEmail()) return;
+        if (sender is not Button { DataContext: ProductRow product } || product.Id <= 0) return;
+        var answer = MessageBox.Show(this,
+            $"Delete product '{product.English}'? This cannot be undone.",
+            "Confirm product deletion", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        if (answer != MessageBoxResult.Yes) return;
+        try
+        {
+            using var connection = new SqliteConnection($"Data Source={GetDatabasePath()}");
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "DELETE FROM Products WHERE Id = $id;";
+            command.Parameters.AddWithValue("$id", product.Id);
+            var affected = command.ExecuteNonQuery();
+            if (_editingProductId == product.Id)
+            {
+                _editingProductId = null;
+                SaveProductButton.Content = "Save Product";
+                ProductStatus.Text = "The edited product was deleted.";
+            }
+            LoadProducts();
+            ProductStatus.Text = affected == 1 ? $"Deleted '{product.English}'." : "Product was not found.";
+        }
+        catch (Exception ex) { ProductStatus.Text = $"Delete failed: {ex.Message}"; }
+    }
+
+    private void EditProduct_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireVerifiedEmail()) return;
+        if (sender is not Button { DataContext: ProductRow product } || product.Id <= 0) return;
+        _editingProductId = product.Id;
+        ProductCategory.SelectedIndex = Math.Max(0, ProductCategory.Items.Cast<ComboBoxItem>().ToList()
+            .FindIndex(x => string.Equals(x.Content?.ToString(), product.Category, StringComparison.Ordinal)));
+        EnglishName.Text = product.English; SinhalaName.Text = product.Sinhala; TamilName.Text = product.Tamil;
+        Mfd.Text = product.Mfd; Expiry.Text = product.Expiry; Batch.Text = product.Batch; NetWeight.Text = product.NetWeight;
+        Sugar.Text = product.Sugar; Salt.Text = product.Salt; Fat.Text = product.Fat; Mrp.Text = product.Mrp;
+        Importer.Text = product.Importer; Copies.Text = product.Copies.ToString();
+        PrintMfd.IsChecked = product.PrintMfd; PrintExpiry.IsChecked = product.PrintExpiry;
+        PrintBatch.IsChecked = product.PrintBatch; PrintNetWeight.IsChecked = product.PrintNetWeight;
+        SaveProductButton.Content = "Update Product";
+        ProductStatus.Text = $"Editing: {product.English}";
+        UpdateLabelPreview(product);
+        EnglishName.Focus();
     }
 
     private void UpdateLabelPreview(ProductRow product)
@@ -884,6 +1304,19 @@ public partial class MainWindow : Window
             );
             """;
         command.ExecuteNonQuery();
+        using (var templatesCommand = connection.CreateCommand())
+        {
+            templatesCommand.CommandText = """
+                CREATE TABLE IF NOT EXISTS LabelTemplates (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+                    DataJson TEXT NOT NULL,
+                    CreatedUtc TEXT NOT NULL,
+                    UpdatedUtc TEXT NOT NULL
+                );
+                """;
+            templatesCommand.ExecuteNonQuery();
+        }
 
         // Upgrade databases created by earlier versions without losing saved products.
         using var columnsCommand = connection.CreateCommand();
@@ -904,24 +1337,25 @@ public partial class MainWindow : Window
 
     private void LoadProducts()
     {
+        _products.Clear();
         using var connection = new SqliteConnection($"Data Source={GetDatabasePath()}");
         connection.Open();
         using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT Category, English, Sinhala, Tamil, Mfd, Expiry, Batch, NetWeight, Sugar, Salt, Fat, Mrp, Importer, Copies,
+            SELECT Id, Category, English, Sinhala, Tamil, Mfd, Expiry, Batch, NetWeight, Sugar, Salt, Fat, Mrp, Importer, Copies,
                    PrintMfd, PrintExpiry, PrintBatch, PrintNetWeight FROM Products ORDER BY Id DESC;
             """;
         using var reader = command.ExecuteReader();
         while (reader.Read())
             _products.Add(new ProductRow
             {
-                Category = reader.GetString(0), English = reader.GetString(1), Sinhala = reader.GetString(2), Tamil = reader.GetString(3),
-                Mfd = reader.GetString(4), Expiry = reader.GetString(5), Batch = reader.GetString(6),
-                NetWeight = reader.GetString(7), Sugar = reader.GetString(8), Salt = reader.GetString(9),
-                Fat = reader.GetString(10), Mrp = reader.GetString(11), Importer = reader.GetString(12),
-                Copies = reader.GetInt32(13), PrintMfd = reader.GetInt32(14) == 1,
-                PrintExpiry = reader.GetInt32(15) == 1, PrintBatch = reader.GetInt32(16) == 1,
-                PrintNetWeight = reader.GetInt32(17) == 1
+                Id = reader.GetInt64(0), Category = reader.GetString(1), English = reader.GetString(2), Sinhala = reader.GetString(3), Tamil = reader.GetString(4),
+                Mfd = reader.GetString(5), Expiry = reader.GetString(6), Batch = reader.GetString(7),
+                NetWeight = reader.GetString(8), Sugar = reader.GetString(9), Salt = reader.GetString(10),
+                Fat = reader.GetString(11), Mrp = reader.GetString(12), Importer = reader.GetString(13),
+                Copies = reader.GetInt32(14), PrintMfd = reader.GetInt32(15) == 1,
+                PrintExpiry = reader.GetInt32(16) == 1, PrintBatch = reader.GetInt32(17) == 1,
+                PrintNetWeight = reader.GetInt32(18) == 1
             });
         ProductCount.Text = _products.Count.ToString();
         if (_products.Count > 0) UpdateLabelPreview(_products[0]);
@@ -929,26 +1363,263 @@ public partial class MainWindow : Window
 
     private void ApplyLayout_Click(object sender, RoutedEventArgs e)
     {
-        if (!double.TryParse(LabelWidthInput.Text, NumberStyles.Number, CultureInfo.InvariantCulture, out var width) ||
-            !double.TryParse(LabelHeightInput.Text, NumberStyles.Number, CultureInfo.InvariantCulture, out var height) ||
-            width <= 0 || height <= 0)
+        if (!RequireVerifiedEmail()) return;
+        static bool ReadPositive(string value, out double number) =>
+            double.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out number) &&
+            double.IsFinite(number) && number > 0;
+        static bool ReadNonNegative(string value, out double number) =>
+            double.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out number) &&
+            double.IsFinite(number) && number >= 0;
+
+        if (!ReadPositive(LabelWidthInput.Text, out var labelWidth) ||
+            !ReadPositive(LabelHeightInput.Text, out var labelHeight))
         {
             LayoutStatus.Text = "Enter positive label width and height in millimetres.";
             return;
         }
         var (paperWidth, paperHeight) = LabelPaperSize.SelectedIndex switch
         {
-            1 => (148d, 210d), 2 => (215.9d, 279.4d), _ => (210d, 297d)
+            1 => (148d, 210d),
+            2 => (215.9d, 279.4d),
+            3 when ReadPositive(CustomPaperWidth.Text, out var cw) &&
+                   ReadPositive(CustomPaperHeight.Text, out var ch) => (cw, ch),
+            3 => (0d, 0d),
+            _ => (210d, 297d)
         };
-        const double margin = 5d, gap = 3d;
-        var columns = (int)Math.Floor((paperWidth - 2 * margin + gap) / (width + gap));
-        var rows = (int)Math.Floor((paperHeight - 2 * margin + gap) / (height + gap));
-        if (columns < 1 || rows < 1)
+        if (paperWidth <= 0 || paperHeight <= 0)
         {
-            LayoutStatus.Text = $"A {width:0.##} × {height:0.##} mm label does not fit this sheet with 5 mm margins and 3 mm gaps.";
+            LayoutStatus.Text = "Enter valid positive custom paper width and height.";
             return;
         }
-        LayoutStatus.Text = $"{LabelPaperSize.Text} · {columns} columns × {rows} rows · {columns * rows} labels/sheet. Geometry only; printer hardware margins are not yet checked.";
+        if (!ReadNonNegative(MarginTopInput.Text, out var top) ||
+            !ReadNonNegative(MarginRightInput.Text, out var right) ||
+            !ReadNonNegative(MarginBottomInput.Text, out var bottom) ||
+            !ReadNonNegative(MarginLeftInput.Text, out var left) ||
+            !ReadNonNegative(GapHorizontalInput.Text, out var gapX) ||
+            !ReadNonNegative(GapVerticalInput.Text, out var gapY))
+        {
+            LayoutStatus.Text = "Margins and gaps must be zero or positive numbers.";
+            return;
+        }
+        if (left + right >= paperWidth || top + bottom >= paperHeight)
+        {
+            LayoutStatus.Text = "Margins leave no usable paper area.";
+            return;
+        }
+        var usableWidth = paperWidth - left - right;
+        var usableHeight = paperHeight - top - bottom;
+        var columns = (int)Math.Floor((usableWidth + gapX) / (labelWidth + gapX));
+        var rows = (int)Math.Floor((usableHeight + gapY) / (labelHeight + gapY));
+        if (columns < 1 || rows < 1)
+        {
+            LayoutStatus.Text = $"A {labelWidth:0.##} × {labelHeight:0.##} mm label does not fit the usable paper area.";
+            return;
+        }
+        var count = checked(columns * rows);
+        LayoutStatus.Text = $"{paperWidth:0.##} × {paperHeight:0.##} mm · {columns} columns × {rows} rows · {count} labels/sheet. Margins T{top}/R{right}/B{bottom}/L{left} mm; gaps H{gapX}/V{gapY} mm. Printer hardware margins still require validation.";
+    }
+
+    private void ExportProductsCsv_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireVerifiedEmail()) return;
+        var dialog = new SaveFileDialog { Filter = "CSV files (*.csv)|*.csv", FileName = "rss-label-maker-products.csv" };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            var rows = new List<string>
+            {
+                "Category,English,Sinhala,Tamil,Mfd,Expiry,Batch,NetWeight,Sugar,Salt,Fat,Mrp,Importer,Copies,PrintMfd,PrintExpiry,PrintBatch,PrintNetWeight"
+            };
+            rows.AddRange(_products.Select(p => string.Join(",", new[]
+            {
+                p.Category,p.English,p.Sinhala,p.Tamil,p.Mfd,p.Expiry,p.Batch,p.NetWeight,p.Sugar,p.Salt,p.Fat,p.Mrp,p.Importer,
+                p.Copies.ToString(CultureInfo.InvariantCulture),p.PrintMfd ? "true" : "false",p.PrintExpiry ? "true" : "false",
+                p.PrintBatch ? "true" : "false",p.PrintNetWeight ? "true" : "false"
+            }.Select(CsvEscape))));
+            File.WriteAllText(dialog.FileName, string.Join(Environment.NewLine, rows), new UTF8Encoding(true));
+            ImportStatus.Text = $"Exported {_products.Count} product(s) to {dialog.FileName}.";
+        }
+        catch (Exception ex) { ImportStatus.Text = $"CSV export failed: {ex.Message}"; }
+    }
+
+    private void ImportProductsCsv_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireVerifiedEmail()) return;
+        var dialog = new OpenFileDialog { Filter = "CSV files (*.csv)|*.csv", Multiselect = false };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            var lines = File.ReadAllLines(dialog.FileName, Encoding.UTF8);
+            if (lines.Length < 2) { ImportStatus.Text = "The CSV file contains no product rows."; return; }
+            var headers = ParseCsvLine(lines[0]).Select((h, i) => (Name: h.Trim(), Index: i))
+                .ToDictionary(x => x.Name, x => x.Index, StringComparer.OrdinalIgnoreCase);
+            if (!headers.ContainsKey("English")) { ImportStatus.Text = "CSV must contain an English column. No data was imported."; return; }
+            var imported = 0; var rejected = new List<string>();
+            using var connection = new SqliteConnection($"Data Source={GetDatabasePath()}");
+            connection.Open();
+            using var transaction = connection.BeginTransaction();
+            for (var lineIndex = 1; lineIndex < lines.Length; lineIndex++)
+            {
+                if (string.IsNullOrWhiteSpace(lines[lineIndex])) continue;
+                try
+                {
+                    var values = ParseCsvLine(lines[lineIndex]);
+                    string Read(string name, string fallback = "") =>
+                        headers.TryGetValue(name, out var index) && index < values.Count ? values[index].Trim() : fallback;
+                    var english = Read("English");
+                    if (string.IsNullOrWhiteSpace(english)) throw new FormatException("English product name is required.");
+                    var copiesText = Read("Copies", "1");
+                    if (!int.TryParse(copiesText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var copies) || copies < 1)
+                        throw new FormatException("Copies must be a positive whole number.");
+                    var product = new ProductRow
+                    {
+                        Category = Read("Category", "Other"), English = english, Sinhala = Read("Sinhala"), Tamil = Read("Tamil"),
+                        Mfd = Read("Mfd"), Expiry = Read("Expiry"), Batch = Read("Batch"), NetWeight = Read("NetWeight"),
+                        Sugar = Read("Sugar"), Salt = Read("Salt"), Fat = Read("Fat"), Mrp = Read("Mrp"), Importer = Read("Importer"),
+                        Copies = copies, PrintMfd = Read("PrintMfd").Equals("true", StringComparison.OrdinalIgnoreCase) || Read("PrintMfd") == "1",
+                        PrintExpiry = Read("PrintExpiry").Equals("true", StringComparison.OrdinalIgnoreCase) || Read("PrintExpiry") == "1",
+                        PrintBatch = Read("PrintBatch").Equals("true", StringComparison.OrdinalIgnoreCase) || Read("PrintBatch") == "1",
+                        PrintNetWeight = Read("PrintNetWeight").Equals("true", StringComparison.OrdinalIgnoreCase) || Read("PrintNetWeight") == "1"
+                    };
+                    using var command = connection.CreateCommand();
+                    command.Transaction = transaction;
+                    command.CommandText = """
+                        INSERT INTO Products
+                        (Category,English,Sinhala,Tamil,Mfd,Expiry,Batch,NetWeight,Sugar,Salt,Fat,Mrp,Importer,Copies,
+                         PrintMfd,PrintExpiry,PrintBatch,PrintNetWeight,CreatedUtc)
+                        VALUES ($category,$english,$sinhala,$tamil,$mfd,$expiry,$batch,$weight,$sugar,$salt,$fat,$mrp,$importer,$copies,
+                         $printMfd,$printExpiry,$printBatch,$printWeight,$createdUtc);
+                        """;
+                    command.Parameters.AddWithValue("$category", product.Category);
+                    command.Parameters.AddWithValue("$english", product.English);
+                    command.Parameters.AddWithValue("$sinhala", product.Sinhala);
+                    command.Parameters.AddWithValue("$tamil", product.Tamil);
+                    command.Parameters.AddWithValue("$mfd", product.Mfd);
+                    command.Parameters.AddWithValue("$expiry", product.Expiry);
+                    command.Parameters.AddWithValue("$batch", product.Batch);
+                    command.Parameters.AddWithValue("$weight", product.NetWeight);
+                    command.Parameters.AddWithValue("$sugar", product.Sugar);
+                    command.Parameters.AddWithValue("$salt", product.Salt);
+                    command.Parameters.AddWithValue("$fat", product.Fat);
+                    command.Parameters.AddWithValue("$mrp", product.Mrp);
+                    command.Parameters.AddWithValue("$importer", product.Importer);
+                    command.Parameters.AddWithValue("$copies", product.Copies);
+                    command.Parameters.AddWithValue("$printMfd", product.PrintMfd ? 1 : 0);
+                    command.Parameters.AddWithValue("$printExpiry", product.PrintExpiry ? 1 : 0);
+                    command.Parameters.AddWithValue("$printBatch", product.PrintBatch ? 1 : 0);
+                    command.Parameters.AddWithValue("$printWeight", product.PrintNetWeight ? 1 : 0);
+                    command.Parameters.AddWithValue("$createdUtc", DateTimeOffset.UtcNow.ToString("O"));
+                    command.ExecuteNonQuery();
+                    imported++;
+                }
+                catch (Exception ex) { rejected.Add($"Row {lineIndex + 1}: {ex.Message}"); }
+            }
+            transaction.Commit();
+            LoadProducts();
+            ImportStatus.Text = $"Imported {imported} product(s). Rejected {rejected.Count} row(s)." +
+                (rejected.Count == 0 ? "" : Environment.NewLine + string.Join(Environment.NewLine, rejected.Take(20)));
+        }
+        catch (Exception ex) { ImportStatus.Text = $"CSV import failed: {ex.Message}"; }
+    }
+
+    private static string CsvEscape(string value) => "\"" + value.Replace("\"", "\"\"") + "\"";
+
+    private static List<string> ParseCsvLine(string line)
+    {
+        var values = new List<string>();
+        var value = new StringBuilder();
+        var quoted = false;
+        for (var i = 0; i < line.Length; i++)
+        {
+            var ch = line[i];
+            if (ch == '"')
+            {
+                if (quoted && i + 1 < line.Length && line[i + 1] == '"') { value.Append('"'); i++; }
+                else quoted = !quoted;
+            }
+            else if (ch == ',' && !quoted) { values.Add(value.ToString()); value.Clear(); }
+            else value.Append(ch);
+        }
+        if (quoted) throw new FormatException("Unclosed quoted CSV field.");
+        values.Add(value.ToString());
+        return values;
+    }
+
+    private void BackupDatabase_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireVerifiedEmail()) return;
+        var dialog = new SaveFileDialog
+        {
+            Filter = "RSS Label Maker database (*.db)|*.db",
+            FileName = $"rss-label-maker-backup-{DateTime.Now:yyyyMMdd-HHmmss}.db"
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            var sourcePath = GetDatabasePath();
+            using var source = new SqliteConnection($"Data Source={sourcePath};Mode=ReadWrite");
+            using var destination = new SqliteConnection($"Data Source={dialog.FileName}");
+            source.Open();
+            destination.Open();
+            source.BackupDatabase(destination);
+            PrintStatus.Text = $"Database backup created: {dialog.FileName}";
+            MessageBox.Show(this, "Database backup completed.", "RSS Label Maker",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"Backup failed: {ex.Message}", "RSS Label Maker",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void RestoreDatabase_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireVerifiedEmail()) return;
+        var dialog = new OpenFileDialog
+        {
+            Filter = "RSS Label Maker database (*.db)|*.db",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        if (MessageBox.Show(this,
+            "Restoring replaces the current local product database. A safety backup of the current database will be created first. Continue?",
+            "Confirm database restore", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            return;
+
+        var currentPath = GetDatabasePath();
+        var stagedPath = currentPath + ".restore-staging";
+        var safetyPath = currentPath + $".pre-restore-{DateTime.Now:yyyyMMdd-HHmmss}.bak";
+        try
+        {
+            using (var incoming = new SqliteConnection($"Data Source={dialog.FileName};Mode=ReadOnly"))
+            {
+                incoming.Open();
+                using var check = incoming.CreateCommand();
+                check.CommandText = "PRAGMA integrity_check;";
+                var integrity = Convert.ToString(check.ExecuteScalar(), CultureInfo.InvariantCulture);
+                if (!string.Equals(integrity, "ok", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException($"Backup integrity check failed: {integrity}");
+                using var staged = new SqliteConnection($"Data Source={stagedPath}");
+                staged.Open();
+                incoming.BackupDatabase(staged);
+            }
+
+            if (File.Exists(currentPath)) File.Copy(currentPath, safetyPath, true);
+            File.Copy(stagedPath, currentPath, true);
+            File.Delete(stagedPath);
+            LoadProducts();
+            MessageBox.Show(this,
+                $"Database restored. Previous database safety copy: {safetyPath}",
+                "RSS Label Maker", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            try { if (File.Exists(stagedPath)) File.Delete(stagedPath); } catch { }
+            MessageBox.Show(this, $"Restore failed. The original database was retained where possible. Details: {ex.Message}",
+                "RSS Label Maker", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private void RefreshPrinters_Click(object sender, RoutedEventArgs e) => RefreshPrinters();
@@ -975,6 +1646,7 @@ public partial class MainWindow : Window
 
     private void TestPrint_Click(object sender, RoutedEventArgs e)
     {
+        if (!RequireVerifiedEmail()) return;
         PrintStatus.Text = "Printer discovery works. Actual-size label rendering and test-page printing are scheduled for the printing milestone.";
     }
 
@@ -1002,8 +1674,32 @@ public partial class MainWindow : Window
         public bool AutomaticUpdatesEnabled { get; set; } = true;
     }
 
-    private sealed class ProductRow
+    private sealed record TemplateRow(long Id, string Name, string DataJson);
+    private sealed class ExportedTemplate
     {
+        public string Name { get; set; } = "";
+        public string DataJson { get; set; } = "";
+    }
+
+
+    private sealed class LayoutTemplateData
+    {
+        public string LabelWidth { get; set; } = "70";
+        public string LabelHeight { get; set; } = "45";
+        public int PaperIndex { get; set; }
+        public string CustomPaperWidth { get; set; } = "210";
+        public string CustomPaperHeight { get; set; } = "297";
+        public string MarginTop { get; set; } = "5";
+        public string MarginRight { get; set; } = "5";
+        public string MarginBottom { get; set; } = "5";
+        public string MarginLeft { get; set; } = "5";
+        public string GapHorizontal { get; set; } = "3";
+        public string GapVertical { get; set; } = "3";
+    }
+
+    private sealed record ProductRow
+    {
+        public long Id { get; init; }
         public string Category { get; init; } = "Other";
         public string English { get; init; } = "";
         public string Sinhala { get; init; } = "";

@@ -14,19 +14,26 @@ internal static class UpdateService
     private const string ReleasesApi = "https://api.github.com/repos/riyazamra1/RSS-Label-Maker-/releases/latest";
     private const string PackageAsset = "RSS-Label-Maker-win-x64.zip";
     private const string ChecksumAsset = "RSS-Label-Maker-win-x64.zip.sha256";
+    private const string ExecutableName = "RSS.LabelMaker.exe";
 
-    public static async Task<StagedUpdate?> CheckAndStageAsync(CancellationToken cancellationToken = default)
+    public static string GetCurrentVersion() => System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "1.0.0";
+
+    public static async Task<StagedUpdate?> CheckAndStageAsync(IProgress<string>? progress = null, CancellationToken cancellationToken = default)
     {
         using var client = new HttpClient();
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("RSS-Label-Maker-Updater/1.0");
-        client.Timeout = TimeSpan.FromMinutes(5);
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("RSS-Label-Maker-Updater/1.1");
+        client.Timeout = TimeSpan.FromMinutes(10);
 
+        progress?.Report("Checking the latest stable GitHub Release…");
         using var response = await client.GetAsync(ReleasesApi, cancellationToken);
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
         response.EnsureSuccessStatusCode();
 
         using var release = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
         var root = release.RootElement;
+        if (root.TryGetProperty("draft", out var draft) && draft.GetBoolean()) return null;
+        if (root.TryGetProperty("prerelease", out var prerelease) && prerelease.GetBoolean()) return null;
+
         var releaseNotes = root.TryGetProperty("body", out var bodyElement) ? bodyElement.GetString() ?? "" : "";
         var tag = root.GetProperty("tag_name").GetString()?.TrimStart('v', 'V');
         if (!Version.TryParse(tag, out var latest)) return null;
@@ -43,28 +50,58 @@ internal static class UpdateService
             !assets.TryGetValue(ChecksumAsset, out var checksumUrl))
             throw new InvalidOperationException("The latest release is missing the Windows package or its SHA-256 checksum.");
 
+        // Only accept assets hosted by the canonical GitHub release download host for this repository.
+        static bool IsCanonicalReleaseAsset(string value) =>
+            Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
+            uri.Scheme == Uri.UriSchemeHttps &&
+            uri.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase) &&
+            uri.AbsolutePath.StartsWith("/riyazamra1/RSS-Label-Maker-/releases/download/", StringComparison.OrdinalIgnoreCase);
+        if (!IsCanonicalReleaseAsset(packageUrl) || !IsCanonicalReleaseAsset(checksumUrl))
+            throw new InvalidDataException("The release contains an unexpected update asset URL.");
+
         var rootPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "Razeen Secure Solution", "RSS Label Maker", "updates");
         Directory.CreateDirectory(rootPath);
         var packagePath = Path.Combine(rootPath, PackageAsset);
         var checksumPath = packagePath + ".sha256";
+        var partialPackage = packagePath + ".download";
+        var partialChecksum = checksumPath + ".download";
 
-        await DownloadAsync(client, packageUrl, packagePath, cancellationToken);
-        await DownloadAsync(client, checksumUrl, checksumPath, cancellationToken);
+        try
+        {
+            progress?.Report($"Downloading RSS Label Maker {latest}…");
+            await DownloadAsync(client, packageUrl, partialPackage, cancellationToken);
+            progress?.Report("Downloading update checksum…");
+            await DownloadAsync(client, checksumUrl, partialChecksum, cancellationToken);
+            var checksumText = await File.ReadAllTextAsync(partialChecksum, cancellationToken);
+            var expectedHash = checksumText.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
+                .FirstOrDefault()?.Trim();
+            if (string.IsNullOrWhiteSpace(expectedHash) || expectedHash.Length != 64 ||
+                !expectedHash.All(Uri.IsHexDigit))
+                throw new InvalidDataException("The release checksum file is invalid.");
 
-        var expectedHash = (await File.ReadAllTextAsync(checksumPath, cancellationToken))
-            .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
-            .FirstOrDefault()?.Trim();
-        if (string.IsNullOrWhiteSpace(expectedHash) || expectedHash.Length != 64)
-            throw new InvalidDataException("The release checksum file is invalid.");
+            progress?.Report("Verifying update package integrity…");
+            await using var packageStream = File.OpenRead(partialPackage);
+            var actualHash = Convert.ToHexString(await SHA256.HashDataAsync(packageStream, cancellationToken));
+            if (!CryptographicOperations.FixedTimeEquals(
+                    Convert.FromHexString(expectedHash), Convert.FromHexString(actualHash)))
+                throw new InvalidDataException("The downloaded update failed SHA-256 integrity verification.");
 
-        await using var packageStream = File.OpenRead(packagePath);
-        var actualHash = Convert.ToHexString(await SHA256.HashDataAsync(packageStream, cancellationToken));
-        if (!CryptographicOperations.FixedTimeEquals(
-                Convert.FromHexString(expectedHash), Convert.FromHexString(actualHash)))
-            throw new InvalidDataException("The downloaded update failed SHA-256 integrity verification.");
+            progress?.Report("Update verified. Preparing the safe installation…");
+            File.Move(partialPackage, packagePath, true);
+            File.Move(partialChecksum, checksumPath, true);
+            return new StagedUpdate(latest.ToString(), current.ToString(), packagePath, releaseNotes);
+        }
+        finally
+        {
+            TryDelete(partialPackage);
+            TryDelete(partialChecksum);
+        }
+    }
 
-        return new StagedUpdate(latest.ToString(), current.ToString(), packagePath, releaseNotes);
+    private static void TryDelete(string path)
+    {
+        try { if (File.Exists(path)) File.Delete(path); } catch { }
     }
 
     private static async Task DownloadAsync(HttpClient client, string url, string path, CancellationToken token)
@@ -81,6 +118,18 @@ internal static class UpdateService
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "Razeen Secure Solution", "RSS Label Maker", "update-completed.json");
 
+    public static void MarkStartupHealthy()
+    {
+        var healthPath = Environment.GetEnvironmentVariable("RLM_UPDATE_HEALTH_PATH");
+        if (string.IsNullOrWhiteSpace(healthPath)) return;
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(healthPath)!);
+            File.WriteAllText(healthPath, DateTimeOffset.UtcNow.ToString("O"));
+        }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine("Update health signal failed: " + ex.Message); }
+    }
+
     public static UpdateWelcomeInfo? ReadPendingUpdate()
     {
         var path = GetUpdateMarkerPath();
@@ -89,7 +138,7 @@ internal static class UpdateService
         catch { return null; }
     }
 
-    public static void AcknowledgeUpdate() 
+    public static void AcknowledgeUpdate()
     {
         var path = GetUpdateMarkerPath();
         if (File.Exists(path)) File.Delete(path);
@@ -97,17 +146,21 @@ internal static class UpdateService
 
     public static void StartUpdater(StagedUpdate update, string executablePath, int parentProcessId)
     {
-        var packagePath = update.PackagePath;
-        var updaterPath = Path.Combine(Path.GetDirectoryName(packagePath)!, "rlm-updater.ps1");
-        var updateInfoPath = Path.Combine(Path.GetDirectoryName(packagePath)!, "update-info.json");
+        var updateRoot = Path.GetDirectoryName(update.PackagePath)!;
+        var updaterPath = Path.Combine(updateRoot, "rlm-updater.ps1");
+        var updateInfoPath = Path.Combine(updateRoot, "update-info.json");
+        var healthPath = Path.Combine(updateRoot, $"update-health-{parentProcessId}.txt");
+        TryDelete(healthPath);
         File.WriteAllText(updateInfoPath, JsonSerializer.Serialize(new UpdateWelcomeInfo(
             update.PreviousVersion, update.Version, update.ReleaseNotes, DateTimeOffset.UtcNow)));
         File.WriteAllText(updaterPath, UpdaterScript);
+
         var start = new ProcessStartInfo
         {
             FileName = "powershell.exe",
-            UseShellExecute = false,
-            CreateNoWindow = true
+            UseShellExecute = true,
+            Verb = "runas",
+            WindowStyle = ProcessWindowStyle.Hidden
         };
         start.ArgumentList.Add("-NoProfile");
         start.ArgumentList.Add("-ExecutionPolicy");
@@ -115,7 +168,7 @@ internal static class UpdateService
         start.ArgumentList.Add("-File");
         start.ArgumentList.Add(updaterPath);
         start.ArgumentList.Add("-PackagePath");
-        start.ArgumentList.Add(packagePath);
+        start.ArgumentList.Add(update.PackagePath);
         start.ArgumentList.Add("-ExecutablePath");
         start.ArgumentList.Add(executablePath);
         start.ArgumentList.Add("-ParentPid");
@@ -124,6 +177,8 @@ internal static class UpdateService
         start.ArgumentList.Add(updateInfoPath);
         start.ArgumentList.Add("-MarkerPath");
         start.ArgumentList.Add(GetUpdateMarkerPath());
+        start.ArgumentList.Add("-HealthPath");
+        start.ArgumentList.Add(healthPath);
         _ = Process.Start(start) ?? throw new InvalidOperationException("Could not start the separate update process.");
     }
 
@@ -133,37 +188,106 @@ param(
     [Parameter(Mandatory=$true)][string]$ExecutablePath,
     [Parameter(Mandatory=$true)][int]$ParentPid,
     [Parameter(Mandatory=$true)][string]$UpdateInfoPath,
-    [Parameter(Mandatory=$true)][string]$MarkerPath
+    [Parameter(Mandatory=$true)][string]$MarkerPath,
+    [Parameter(Mandatory=$true)][string]$HealthPath
 )
 $ErrorActionPreference = 'Stop'
 $installDir = Split-Path -Parent $ExecutablePath
 $exeName = Split-Path -Leaf $ExecutablePath
-$workDir = Join-Path $env:LOCALAPPDATA 'Razeen Secure Solution\RSS Label Maker\update-stage'
-$backupPath = Join-Path $workDir ($exeName + '.previous')
-New-Item -ItemType Directory -Force -Path $workDir | Out-Null
+$parentDir = Split-Path -Parent $installDir
+$installLeaf = Split-Path -Leaf $installDir
+$workRoot = Join-Path (Join-Path $env:LOCALAPPDATA 'Razeen Secure Solution') 'RSS Label Maker'
+$stageDir = Join-Path $workRoot 'update-stage'
+$candidateDir = Join-Path $parentDir ($installLeaf + '.rlm-new')
+$backupDir = Join-Path $parentDir ($installLeaf + '.rlm-previous')
+$packageDir = Join-Path $stageDir 'package'
+$swapped = $false
+$newProcess = $null
+
+function Remove-Safe([string]$Path) {
+    if (Test-Path -LiteralPath $Path) {
+        Remove-Item -LiteralPath $Path -Recurse -Force
+    }
+}
+
 try {
-    Wait-Process -Id $ParentPid -Timeout 120
-} catch {}
-try {
-    if (Test-Path $backupPath) { Remove-Item $backupPath -Force }
-    Expand-Archive -LiteralPath $PackagePath -DestinationPath $workDir -Force
-    $stagedExe = Join-Path $workDir $exeName
-    if (!(Test-Path $stagedExe)) { throw 'Update archive does not contain the expected executable.' }
-    if (Test-Path $ExecutablePath) { Copy-Item $ExecutablePath $backupPath -Force }
-    Copy-Item $stagedExe $ExecutablePath -Force
+    $parentDeadline = (Get-Date).AddSeconds(180)
+    while (Get-Process -Id $ParentPid -ErrorAction SilentlyContinue) {
+        if ((Get-Date) -gt $parentDeadline) { throw 'The previous application did not close in time; update was cancelled.' }
+        Start-Sleep -Seconds 1
+    }
+
+    Remove-Safe $stageDir
+    Remove-Safe $candidateDir
+    New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
+    Expand-Archive -LiteralPath $PackagePath -DestinationPath $packageDir -Force
+
+    $stagedExe = Join-Path $packageDir $exeName
+    $stagedAssembly = Join-Path $packageDir 'RSS.LabelMaker.dll'
+    if (!(Test-Path -LiteralPath $stagedExe) -or !(Test-Path -LiteralPath $stagedAssembly)) {
+        throw 'The update archive is incomplete; the application executable or managed assembly is missing.'
+    }
+
+    # Copy the complete self-contained publish output beside the installation. User data lives in LocalAppData and is not touched.
+    New-Item -ItemType Directory -Force -Path $candidateDir | Out-Null
+    Copy-Item -Path (Join-Path $packageDir '*') -Destination $candidateDir -Recurse -Force
+    if (!(Test-Path -LiteralPath (Join-Path $candidateDir $exeName)) -or
+        !(Test-Path -LiteralPath (Join-Path $candidateDir 'RSS.LabelMaker.dll'))) {
+        throw 'The staged application failed its file validation.'
+    }
+
+    Remove-Safe $backupDir
+    if (Test-Path -LiteralPath $installDir) {
+        Move-Item -LiteralPath $installDir -Destination $backupDir
+    }
+    try {
+        Move-Item -LiteralPath $candidateDir -Destination $installDir
+        $swapped = $true
+    } catch {
+        if (Test-Path -LiteralPath $backupDir) {
+            Move-Item -LiteralPath $backupDir -Destination $installDir
+        }
+        throw
+    }
+
     $markerDir = Split-Path -Parent $MarkerPath
     New-Item -ItemType Directory -Force -Path $markerDir | Out-Null
-    Copy-Item $UpdateInfoPath $MarkerPath -Force
+    Copy-Item -LiteralPath $UpdateInfoPath -Destination $MarkerPath -Force
+    if (Test-Path -LiteralPath $HealthPath) { Remove-Item -LiteralPath $HealthPath -Force }
+    $env:RLM_UPDATE_HEALTH_PATH = $HealthPath
     $newProcess = Start-Process -FilePath $ExecutablePath -PassThru
-    Start-Sleep -Seconds 8
+
+    $healthDeadline = (Get-Date).AddSeconds(180)
+    while (!(Test-Path -LiteralPath $HealthPath)) {
+        $newProcess.Refresh()
+        if ($newProcess.HasExited) { throw 'Updated application exited before confirming successful RSS account startup; rolling back.' }
+        if ((Get-Date) -gt $healthDeadline) { throw 'Updated application did not complete startup validation; rolling back.' }
+        Start-Sleep -Seconds 1
+    }
     $newProcess.Refresh()
-    if ($newProcess.HasExited) { throw 'Updated application exited during startup; rolling back.' }
-    if (Test-Path $backupPath) { Remove-Item $backupPath -Force }
-    Remove-Item $workDir -Recurse -Force -ErrorAction SilentlyContinue
+    if ($newProcess.HasExited) { throw 'Updated application exited immediately after startup validation; rolling back.' }
+
+    Remove-Item Env:RLM_UPDATE_HEALTH_PATH -ErrorAction SilentlyContinue
+    Remove-Safe $backupDir
+    Remove-Safe $stageDir
+    if (Test-Path -LiteralPath $HealthPath) { Remove-Item -LiteralPath $HealthPath -Force }
 } catch {
-    if (Test-Path $MarkerPath) { Remove-Item $MarkerPath -Force -ErrorAction SilentlyContinue }
-    if (Test-Path $backupPath) { Copy-Item $backupPath $ExecutablePath -Force }
-    Start-Process -FilePath $ExecutablePath -ErrorAction SilentlyContinue
+    Remove-Item Env:RLM_UPDATE_HEALTH_PATH -ErrorAction SilentlyContinue
+    if ($newProcess -and !$newProcess.HasExited) {
+        Stop-Process -Id $newProcess.Id -Force -ErrorAction SilentlyContinue
+    }
+    if (Test-Path -LiteralPath $MarkerPath) {
+        Remove-Item -LiteralPath $MarkerPath -Force -ErrorAction SilentlyContinue
+    }
+    if ($swapped -and (Test-Path -LiteralPath $installDir)) {
+        Remove-Safe $installDir
+    }
+    if (Test-Path -LiteralPath $backupDir) {
+        Move-Item -LiteralPath $backupDir -Destination $installDir -Force
+    }
+    if (Test-Path -LiteralPath $ExecutablePath) {
+        Start-Process -FilePath $ExecutablePath -ErrorAction SilentlyContinue
+    }
     exit 1
 }
 """;
