@@ -131,8 +131,13 @@ internal sealed class AccountWindow : Window
         {
             if (_registerMode)
             {
-                _status.Text = await RssCoreAccountClient.RegisterAsync(_name.Text.Trim(), _email.Text.Trim(), _password.Password);
-                _password.Clear();
+                var registrationMessage = await RssCoreAccountClient.RegisterAsync(_name.Text.Trim(), _email.Text.Trim(), _password.Password);
+                _status.Text = registrationMessage;
+                _status.Foreground = Brush("#176B3A");
+                _status.FontWeight = FontWeights.SemiBold;
+                MessageBox.Show(registrationMessage, "RSS Label Maker account", MessageBoxButton.OK, MessageBoxImage.Information);
+                if (registrationMessage.Contains("already verified", StringComparison.OrdinalIgnoreCase))
+                    SetMode(false);
             }
             else
             {
@@ -140,7 +145,13 @@ internal sealed class AccountWindow : Window
                 ShowSignedIn(session);
             }
         }
-        catch (Exception ex) { _status.Text = ex.Message; }
+        catch (Exception ex)
+        {
+            _status.Text = ex.Message;
+            _status.Foreground = Brush("#B42318");
+            _status.FontWeight = FontWeights.SemiBold;
+            MessageBox.Show(ex.Message, "RSS Label Maker — account creation failed", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
         finally { _submit.IsEnabled = true; }
     }
 
